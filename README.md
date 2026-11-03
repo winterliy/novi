@@ -1,22 +1,34 @@
 # Novi
 
-Novi is a small interpreted language written in C++. The first milestone is a calculator that can read expressions such as `1 + 2 * 3` and print `7`.
+Novi is an experimental C++ language implementation. Its backend foundation includes source spans and diagnostics, a syntax-neutral AST, bytecode compilation, and a stack-based interpreter VM with function and class runtime objects. The surface parser is deliberately limited to calculator expressions until the Novi syntax decisions in [`docs/tasks/novi-language-front-end.md`](docs/tasks/novi-language-front-end.md) are filled in.
 
-## Build and run in VS Code
+## Build
 
-The project uses the Apple Clang compiler installed with the macOS Command Line Tools. In VS Code, press **⌘⇧B** to build. To build and start Novi, open the Command Palette (**⇧⌘P**), choose **Tasks: Run Task**, then select **Run Novi**.
+The project requires a C++17 compiler and CMake 3.16 or newer:
 
-Type a line and press Enter. Type `exit` to quit.
+```sh
+cmake -S . -B build
+cmake --build build
+```
 
-## VS Code
+Or compile directly with a C++17 compiler:
 
-Open this folder in VS Code and install Microsoft's **C/C++** extension if it is not already installed. The project task compiles `src/main.cpp` with the macOS SDK headers.
+```sh
+c++ -std=c++17 -Wall -Wextra -Wpedantic -Isrc \
+  src/main.cpp src/novi/compiler.cpp src/novi/lexer.cpp \
+  src/novi/parser.cpp src/novi/runtime.cpp src/novi/vm.cpp \
+  -o novi
+```
 
-## Learning milestones
+## Run
 
-1. Read one line and tokenize numbers and `+ - * / ( )`.
-2. Parse expressions with precedence and parentheses.
-3. Evaluate the expression and report readable errors.
-4. Add variables and a `print` statement.
+```sh
+./build/novi
+```
 
-The initial implementation is intentionally a calculator. We will add each language feature in small steps so the code remains understandable.
+Enter arithmetic expressions such as `1 + 2 * 3`; type `exit` to leave the REPL. The object/function bytecode model is available to compiler-generated modules, but class/function surface syntax and a resolver/type checker remain future work pending language decisions.
+
+## Design tasks
+
+- [Novi front-end syntax and feature decisions](docs/tasks/novi-language-front-end.md)
+- [Object-oriented compiler and interpreter backend](docs/tasks/novi-object-oriented-backend.md)
