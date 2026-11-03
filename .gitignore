@@ -1,0 +1,6 @@
+/build/
+.DS_Store
+/.vscode/
+/novi
+/src/main
+/src/main.dSYM/
