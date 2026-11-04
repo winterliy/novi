@@ -725,6 +725,18 @@ Value VM::execute() {
                             source->values.pop_front();
                             return value;
                         };
+                    } else if (name == "peek") {
+                        method->arity = 0;
+                        method->callback = [source](VM&, const std::vector<Value>&, const SourceSpan&) {
+                            if (source->values.empty()) throw std::runtime_error("Cannot peek at an empty queue");
+                            return source->values.front();
+                        };
+                    } else if (name == "clear") {
+                        method->arity = 0;
+                        method->callback = [source](VM&, const std::vector<Value>&, const SourceSpan&) {
+                            source->values.clear();
+                            return Value{};
+                        };
                     } else if (name == "length") {
                         method->arity = 0;
                         method->callback = [source](VM&, const std::vector<Value>&, const SourceSpan&) {

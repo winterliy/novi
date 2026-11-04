@@ -36,4 +36,5 @@ console.print(tags.remove('compiler'):string);
 vari tasks : queue = queue();
 tasks.enqueue('parse');
 tasks.enqueue('compile');
+console.print(tasks.peek():string);
 console.print(tasks.dequeue():string);
