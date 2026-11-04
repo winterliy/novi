@@ -42,6 +42,7 @@ private:
     struct LoopContext {
         int continue_target = 0;
         int scope_depth = 0;
+        int exception_depth = 0;
         std::vector<int> break_jumps;
     };
 
@@ -50,8 +51,23 @@ private:
             emit(OpCode::ExitScope, 0, span);
     }
 
-    void emit(OpCode op, int operand, const SourceSpan& span, int operand2 = 0, int operand3 = 0) {
-        function_->chunk.code.push_back({op, operand, span, operand2, operand3});
+    void emit_exception_pops_to(int target_depth, const SourceSpan& span) {
+        for (int depth = exception_depth_; depth > target_depth; --depth)
+            emit(OpCode::PopExceptionHandler, 0, span);
+    }
+
+    void compile_active_finalizers(const SourceSpan& span) {
+        const auto finalizers = active_finalizers_;
+        for (std::size_t offset = finalizers.size(); offset > 0; --offset) {
+            active_finalizers_.resize(offset - 1);
+            compile_statement(*finalizers[offset - 1]);
+        }
+        active_finalizers_ = finalizers;
+    }
+
+    void emit(OpCode op, int operand, const SourceSpan& span, int operand2 = 0,
+              int operand3 = 0, int operand4 = 0) {
+        function_->chunk.code.push_back({op, operand, span, operand2, operand3, operand4});
     }
 
     int add_constant(Constant value) {
@@ -125,7 +141,7 @@ private:
                 const int exit_jump = static_cast<int>(function_->chunk.code.size());
                 emit(OpCode::JumpIfFalse, -1, node.condition->span);
                 emit(OpCode::Pop, 0, node.condition->span);
-                loops_.push_back({loop_start, scope_depth_, {}});
+                loops_.push_back({loop_start, scope_depth_, exception_depth_, {}});
                 compile_statement(*node.body);
                 LoopContext loop = std::move(loops_.back());
                 loops_.pop_back();
@@ -143,7 +159,7 @@ private:
                 const int next_instruction = static_cast<int>(function_->chunk.code.size());
                 emit(OpCode::IteratorNext, add_constant(node.names.front()), statement.span,
                      -1, node.names.size() > 1 ? add_constant(node.names[1]) : -1);
-                loops_.push_back({loop_start, scope_depth_, {}});
+                loops_.push_back({loop_start, scope_depth_, exception_depth_, {}});
                 compile_statement(*node.body);
                 LoopContext loop = std::move(loops_.back());
                 loops_.pop_back();
@@ -166,34 +182,66 @@ private:
             [&](const ReturnStmt& node) {
                 if (node.value) compile_expression(*node.value);
                 else emit(OpCode::Null, 0, statement.span);
+                compile_active_finalizers(statement.span);
                 emit(OpCode::Return, 0, statement.span);
             },
             [&](const BreakStmt&) {
+                compile_active_finalizers(statement.span);
                 exit_scopes_to(loops_.back().scope_depth, statement.span);
+                emit_exception_pops_to(loops_.back().exception_depth, statement.span);
                 const int jump = static_cast<int>(function_->chunk.code.size());
                 emit(OpCode::Jump, -1, statement.span);
                 loops_.back().break_jumps.push_back(jump);
             },
             [&](const ContinueStmt&) {
+                compile_active_finalizers(statement.span);
                 exit_scopes_to(loops_.back().scope_depth, statement.span);
+                emit_exception_pops_to(loops_.back().exception_depth, statement.span);
                 emit(OpCode::Jump, loops_.back().continue_target, statement.span);
             },
             [&](const ThrowStmt& node) {
                 emit(OpCode::Throw, add_constant(node.error_kind), statement.span);
             },
-            [&](const TryCatchStmt& node) {
+            [&](const TryStmt& node) {
+                const int exception_id = next_exception_id_++;
                 const int handler = static_cast<int>(function_->chunk.code.size());
                 emit(OpCode::PushExceptionHandler, -1, statement.span,
-                     add_constant(node.error_name));
+                     node.error_name ? add_constant(*node.error_name) : -1, -1, exception_id);
+                ++exception_depth_;
+                if (node.finally_body) active_finalizers_.push_back(node.finally_body.get());
                 compile_statement(*node.body);
                 emit(OpCode::PopExceptionHandler, 0, statement.span);
+                --exception_depth_;
+                if (node.finally_body) {
+                    active_finalizers_.pop_back();
+                    compile_statement(*node.finally_body);
+                }
                 const int end_jump = static_cast<int>(function_->chunk.code.size());
                 emit(OpCode::Jump, -1, statement.span);
-                function_->chunk.code[static_cast<std::size_t>(handler)].operand =
-                    static_cast<int>(function_->chunk.code.size());
-                compile_statement(*node.catch_body);
-                emit(OpCode::ExitScope, 0, statement.span);
-                patch_jump(end_jump);
+                std::vector<int> end_jumps{end_jump};
+                if (node.catch_body) {
+                    function_->chunk.code[static_cast<std::size_t>(handler)].operand =
+                        static_cast<int>(function_->chunk.code.size());
+                    ++exception_depth_;
+                    if (node.finally_body) active_finalizers_.push_back(node.finally_body.get());
+                    compile_statement(*node.catch_body);
+                    emit(OpCode::PopExceptionHandler, 0, statement.span);
+                    --exception_depth_;
+                    if (node.finally_body) {
+                        active_finalizers_.pop_back();
+                        compile_statement(*node.finally_body);
+                    }
+                    const int catch_end = static_cast<int>(function_->chunk.code.size());
+                    emit(OpCode::Jump, -1, statement.span);
+                    end_jumps.push_back(catch_end);
+                }
+                if (node.finally_body) {
+                    function_->chunk.code[static_cast<std::size_t>(handler)].operand3 =
+                        static_cast<int>(function_->chunk.code.size());
+                    compile_statement(*node.finally_body);
+                    emit(OpCode::Rethrow, exception_id, statement.span);
+                }
+                for (const int jump : end_jumps) patch_jump(jump);
             },
             [&](const ClassDeclStmt& node) {
                 if (node.superclass) emit(OpCode::GetName, add_constant(*node.superclass), statement.span);
@@ -351,6 +399,9 @@ private:
     std::shared_ptr<FunctionPrototype> function_;
     std::vector<LoopContext> loops_;
     int scope_depth_ = 0;
+    int exception_depth_ = 0;
+    int next_exception_id_ = 0;
+    std::vector<const Stmt*> active_finalizers_;
 };
 
 }  // namespace

@@ -27,10 +27,18 @@ private:
     };
     struct ExceptionHandler {
         std::size_t frame_index = 0;
-        std::size_t target_instruction = 0;
+        int catch_target = -1;
+        int finally_target = -1;
         std::size_t stack_size = 0;
         std::shared_ptr<Environment> environment;
         std::string error_name;
+        int exception_id = -1;
+        bool caught = false;
+    };
+    struct PendingException {
+        std::size_t frame_index = 0;
+        int exception_id = -1;
+        RuntimeError error;
     };
 
     Value execute();
@@ -53,6 +61,7 @@ private:
     std::vector<Value> stack_;
     std::vector<Frame> frames_;
     std::vector<ExceptionHandler> exception_handlers_;
+    std::vector<PendingException> pending_exceptions_;
     bool finished_ = false;
     Value final_result_;
 };

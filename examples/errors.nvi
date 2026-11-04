@@ -4,4 +4,6 @@ try {
     throw InvalidValue;
 } catch (error) {
     console.print(error:string);
+} finally {
+    console.print('error handling finished');
 }

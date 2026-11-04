@@ -46,7 +46,7 @@ Novi 언어로 작성한 소스 파일의 확장자는 `.nvi`다. 컴파일러/�
 | 접근 제어 | 클래스 기본 공개, `#` 또는 `private`는 비공개, `public` 명시 가능 | `#`의 멤버 접두 문법과 상속 접근 규칙 |
 | 문장 종료/주석 | 문장 끝 `;`; `{ ... }`로 끝나는 문장은 생략 가능. 줄 시작 또는 `;` 뒤 `//`는 한 줄 주석, 여러 줄은 `//* ... *//` |
 | 키워드 표기 | 키워드 동의어 허용, 키워드 대소문자 구분 없음 | 일반 식별자와 타입 이름은 대소문자 구분 여부를 별도 결정 |
-| 예외 처리 | `try { ... } catch (error) { ... }`; `throw ErrorKind;` | `finally` 실행 보장, 오류 payload/type |
+| 예외 처리 | `try { ... } catch (error) { ... } finally { ... }`; `throw ErrorKind;` | 오류 payload/type |
 
 변수와 문자열 표기는 다음과 같이 정했다.
 
@@ -454,7 +454,7 @@ vari double : = function {x} then output(x * 2);
 | 오류 전파 | 예외가 상위로 전달 | 예외가 상위로 전달 | 명시적 반환 | 예외/Promise reject | `=> ""` |
 | 자원 정리 | `with` / `finally` | try-with-resources / RAII | `defer` | `finally` / `using` (버전별) | `=> ""` |
 
-현재 Novi 예외 표기는 `try { ... } catch (error) { ... }`로 처리하고 `throw ErrorKind;`로 발생시킨다. 현재 구현은 try/catch와 error 이름 문자열 바인딩을 지원한다. `finally`는 정상 종료뿐 아니라 예외와 함수 반환 경로에서도 실행되어야 하므로 아직 구현하지 않았고, parser가 명시적으로 미지원 진단을 낸다. 오류 종류는 이름 있는 타입/키워드로 정의하며, 예를 들어 `throw UndefinedVariable;`은 정의되지 않은 변수를 참조했을 때 사용할 오류 종류다. 구체적인 전체 오류 목록과 사용자 정의 오류 payload 문법은 후속 결정 항목이다.
+현재 Novi 예외 표기는 `try { ... } catch (error) { ... } finally { ... }`이며, `catch`와 `finally` 중 하나 이상을 쓸 수 있다. `throw ErrorKind;`로 오류를 발생시키고 catch 변수에는 오류 메시지 문자열을 넣는다. `finally`는 정상 종료, catch 완료, 처리되지 않은 예외, `return`·`break`·`continue`에서 실행한다. 오류 종류는 이름 있는 타입/키워드로 정의하며, 예를 들어 `throw UndefinedVariable;`은 정의되지 않은 변수를 참조했을 때 사용할 오류 종류다. 구체적인 전체 오류 목록과 사용자 정의 오류 payload 문법은 후속 결정 항목이다.
 
 - 오류 타입 계층과 사용자 정의 오류: **Novi => ""**
 - 복구 가능한 오류와 프로그래밍 오류 구분: **Novi => ""**

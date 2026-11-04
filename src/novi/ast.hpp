@@ -68,7 +68,12 @@ struct ReturnStmt { ExprPtr value; };
 struct BreakStmt {};
 struct ContinueStmt {};
 struct ThrowStmt { std::string error_kind; };
-struct TryCatchStmt { StmtPtr body; std::string error_name; StmtPtr catch_body; };
+struct TryStmt {
+    StmtPtr body;
+    std::optional<std::string> error_name;
+    StmtPtr catch_body;
+    StmtPtr finally_body;
+};
 struct FieldDeclStmt { std::string name; ExprPtr initializer; bool is_static = false; bool is_private = false; };
 struct ClassDeclStmt {
     std::string name;
@@ -83,7 +88,7 @@ struct Stmt {
     using Node = std::variant<ExpressionStmt, VariableDeclStmt, BlockStmt, IfStmt,
                               WhileStmt, ForEachStmt, ReflexStmt, FunctionDeclStmt, ReturnStmt, MakeConstantStmt,
                               ClassDeclStmt, ImportStmt, ExportStmt, BreakStmt, ContinueStmt,
-                              ThrowStmt, TryCatchStmt>;
+                              ThrowStmt, TryStmt>;
     SourceSpan span;
     Node node;
 

@@ -501,21 +501,23 @@ StmtPtr Parser::statement(std::vector<std::string>) {
     if (match_name("try")) {
         const Token start = previous();
         StmtPtr body = block_statement();
-        if (!match_name("catch")) {
-            report(peek(), "A try block currently requires catch(error)");
+        std::optional<std::string> error_name;
+        StmtPtr catch_body;
+        StmtPtr finally_body;
+        if (match_name("catch")) {
+            consume(TokenKind::LeftParen, "Expected '(' after catch");
+            error_name = consume_name("Expected catch variable name").lexeme;
+            consume(TokenKind::RightParen, "Expected ')' after catch variable");
+            catch_body = block_statement();
+        }
+        if (match_name("finally")) finally_body = block_statement();
+        if (!catch_body && !finally_body) {
+            report(peek(), "A try block requires catch(error), finally, or both");
             throw ParseFailure{};
         }
-        consume(TokenKind::LeftParen, "Expected '(' after catch");
-        const std::string error_name = consume_name("Expected catch variable name").lexeme;
-        consume(TokenKind::RightParen, "Expected ')' after catch variable");
-        StmtPtr catch_body = block_statement();
-        if (match_name("finally")) {
-            if (check(TokenKind::LeftBrace)) (void)block_statement();
-            report(previous(), "finally is not supported in this implementation step");
-            throw ParseFailure{};
-        }
-        return std::make_unique<Stmt>(SourceSpan{start.span.start, catch_body->span.end},
-            TryCatchStmt{std::move(body), error_name, std::move(catch_body)});
+        const std::size_t end = finally_body ? finally_body->span.end : catch_body->span.end;
+        return std::make_unique<Stmt>(SourceSpan{start.span.start, end},
+            TryStmt{std::move(body), std::move(error_name), std::move(catch_body), std::move(finally_body)});
     }
     if (match_name("throw")) {
         const Token start = previous();

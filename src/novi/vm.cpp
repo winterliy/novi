@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <iterator>
 #include <ostream>
 #include <sstream>
 
@@ -98,6 +99,7 @@ Value VM::run(const CompiledModule& module) {
     stack_.clear();
     frames_.clear();
     exception_handlers_.clear();
+    pending_exceptions_.clear();
     finished_ = false;
     final_result_ = Value{};
     auto entry = std::make_shared<FunctionObject>();
@@ -323,11 +325,16 @@ Value VM::execute() {
                 break;
             }
             case OpCode::PushExceptionHandler: {
-                if (instruction.operand < 0 || static_cast<std::size_t>(instruction.operand) > code.size())
+                const bool valid_catch = instruction.operand == -1 ||
+                    (instruction.operand >= 0 && static_cast<std::size_t>(instruction.operand) <= code.size());
+                const bool valid_finally = instruction.operand3 == -1 ||
+                    (instruction.operand3 >= 0 && static_cast<std::size_t>(instruction.operand3) <= code.size());
+                if (!valid_catch || !valid_finally || (instruction.operand == -1 && instruction.operand3 == -1))
                     fail("Invalid exception handler target", instruction.span);
-                exception_handlers_.push_back({frames_.size() - 1,
-                    static_cast<std::size_t>(instruction.operand), stack_.size(),
-                    frame.environment, name_at(frame, instruction.operand2, instruction.span)});
+                exception_handlers_.push_back({frames_.size() - 1, instruction.operand,
+                    instruction.operand3, stack_.size(), frame.environment,
+                    instruction.operand2 >= 0 ? name_at(frame, instruction.operand2, instruction.span) : "",
+                    instruction.operand4, false});
                 break;
             }
             case OpCode::PopExceptionHandler:
@@ -337,6 +344,16 @@ Value VM::execute() {
                 break;
             case OpCode::Throw:
                 fail(name_at(frame, instruction.operand, instruction.span), instruction.span);
+            case OpCode::Rethrow: {
+                const auto pending = std::find_if(pending_exceptions_.rbegin(), pending_exceptions_.rend(),
+                    [&](const PendingException& item) {
+                        return item.frame_index == frames_.size() - 1 && item.exception_id == instruction.operand;
+                    });
+                if (pending == pending_exceptions_.rend()) fail("No pending exception to rethrow", instruction.span);
+                RuntimeError error = pending->error;
+                pending_exceptions_.erase(std::next(pending).base());
+                throw error;
+            }
             case OpCode::GetIndex: {
                 Value key = pop(instruction.span);
                 Value object = pop(instruction.span);
@@ -632,6 +649,9 @@ Value VM::execute() {
                 while (!exception_handlers_.empty() &&
                        exception_handlers_.back().frame_index == frames_.size() - 1)
                     exception_handlers_.pop_back();
+                pending_exceptions_.erase(std::remove_if(pending_exceptions_.begin(), pending_exceptions_.end(),
+                    [&](const PendingException& item) { return item.frame_index == frames_.size() - 1; }),
+                    pending_exceptions_.end());
                 Frame finished = std::move(frames_.back());
                 frames_.pop_back();
                 if (finished.return_override) result = Value(finished.return_override);
@@ -644,19 +664,42 @@ Value VM::execute() {
             }
         }
         } catch (const RuntimeError& error) {
-            if (exception_handlers_.empty()) throw;
-            ExceptionHandler handler = std::move(exception_handlers_.back());
-            exception_handlers_.pop_back();
-            while (!exception_handlers_.empty() &&
-                   exception_handlers_.back().frame_index > handler.frame_index)
+            bool handled = false;
+            while (!exception_handlers_.empty()) {
+                ExceptionHandler& top = exception_handlers_.back();
+                if (!top.caught && top.catch_target >= 0) {
+                    top.caught = true;
+                    const ExceptionHandler handler = top;
+                    while (frames_.size() > handler.frame_index + 1) frames_.pop_back();
+                    if (handler.frame_index >= frames_.size()) throw;
+                    stack_.resize(handler.stack_size);
+                    Frame& catch_frame = frames_[handler.frame_index];
+                    catch_frame.environment = make_environment(handler.environment);
+                    catch_frame.environment->define(handler.error_name, Value(error.what()));
+                    catch_frame.instruction_pointer = static_cast<std::size_t>(handler.catch_target);
+                    handled = true;
+                    break;
+                }
+                if (top.finally_target >= 0) {
+                    ExceptionHandler handler = std::move(top);
+                    exception_handlers_.pop_back();
+                    while (frames_.size() > handler.frame_index + 1) frames_.pop_back();
+                    if (handler.frame_index >= frames_.size()) throw;
+                    stack_.resize(handler.stack_size);
+                    Frame& finally_frame = frames_[handler.frame_index];
+                    finally_frame.environment = std::move(handler.environment);
+                    pending_exceptions_.erase(std::remove_if(pending_exceptions_.begin(), pending_exceptions_.end(),
+                        [&](const PendingException& item) {
+                            return item.frame_index == handler.frame_index && item.exception_id == handler.exception_id;
+                        }), pending_exceptions_.end());
+                    pending_exceptions_.push_back({handler.frame_index, handler.exception_id, error});
+                    finally_frame.instruction_pointer = static_cast<std::size_t>(handler.finally_target);
+                    handled = true;
+                    break;
+                }
                 exception_handlers_.pop_back();
-            while (frames_.size() > handler.frame_index + 1) frames_.pop_back();
-            if (handler.frame_index >= frames_.size()) throw;
-            stack_.resize(handler.stack_size);
-            Frame& catch_frame = frames_[handler.frame_index];
-            catch_frame.environment = make_environment(std::move(handler.environment));
-            catch_frame.environment->define(handler.error_name, Value(error.what()));
-            catch_frame.instruction_pointer = handler.target_instruction;
+            }
+            if (!handled) throw;
         }
     }
     return final_result_;

@@ -20,7 +20,7 @@ enum class OpCode {
     BitwiseAnd, BitwiseOr, BitwiseXor, ShiftLeft, ShiftRight, LogicalAnd, LogicalOr,
     Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual,
     Jump, JumpIfFalse, EnterScope, ExitScope, IteratorInit, IteratorNext,
-    PushExceptionHandler, PopExceptionHandler, Throw,
+    PushExceptionHandler, PopExceptionHandler, Throw, Rethrow,
     GetIndex, SetIndex,
     MakeClosure, DefineClass, GetProperty, SetProperty,
     Call, Return
@@ -34,6 +34,7 @@ struct Instruction {
     SourceSpan span;
     int operand2 = 0;
     int operand3 = 0;
+    int operand4 = 0;
 };
 
 struct ClassPrototype {
