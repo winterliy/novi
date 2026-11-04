@@ -3,9 +3,11 @@ import {novi} from {novi};
 vari names : list = list();
 names.append('Ada');
 names.append('Grace');
+names.insert(1, 'Linus');
 console.print(names[0]:string);
 console.print(names.contains('Grace'):string);
 console.print(names.remove('Ada'):string);
+console.print(names.pop():string);
 console.print('Novi'[1]:string);
 console.print('안녕'.length():string);
 foreach (character in '안녕') {

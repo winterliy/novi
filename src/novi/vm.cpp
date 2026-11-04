@@ -642,6 +642,24 @@ Value VM::execute() {
                             source->values.push_back(args[0]);
                             return Value{};
                         };
+                    } else if (name == "insert") {
+                        method->arity = 2;
+                        method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {
+                            const auto* index = std::get_if<double>(&args[0].data);
+                            if (!index || !std::isfinite(*index) || std::trunc(*index) != *index || *index < 0.0 ||
+                                *index > static_cast<double>(source->values.size()))
+                                throw std::runtime_error("List insert index must be an integer from 0 through length");
+                            source->values.insert(source->values.begin() + static_cast<std::ptrdiff_t>(*index), args[1]);
+                            return Value{};
+                        };
+                    } else if (name == "pop") {
+                        method->arity = 0;
+                        method->callback = [source](VM&, const std::vector<Value>&, const SourceSpan&) {
+                            if (source->values.empty()) throw std::runtime_error("Cannot pop from an empty list");
+                            Value value = std::move(source->values.back());
+                            source->values.pop_back();
+                            return value;
+                        };
                     } else if (name == "contains") {
                         method->arity = 1;
                         method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {
