@@ -9,6 +9,7 @@ console.print(names[0]:string);
 console.print(names.contains('Grace'):string);
 console.print(names.remove('Ada'):string);
 console.print(names.pop():string);
+console.print(names.pop(0):string);
 console.print('Novi'[1]:string);
 console.print('안녕'.length():string);
 foreach (character in '안녕') {

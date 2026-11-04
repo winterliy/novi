@@ -681,11 +681,20 @@ Value VM::execute() {
                             return Value{};
                         };
                     } else if (name == "pop") {
-                        method->arity = 0;
-                        method->callback = [source](VM&, const std::vector<Value>&, const SourceSpan&) {
+                        method->variadic = true;
+                        method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {
+                            if (args.size() > 1) throw std::runtime_error("list.pop expects zero or one index");
                             if (source->values.empty()) throw std::runtime_error("Cannot pop from an empty list");
-                            Value value = std::move(source->values.back());
-                            source->values.pop_back();
+                            std::size_t index = source->values.size() - 1;
+                            if (!args.empty()) {
+                                const auto* requested = std::get_if<double>(&args[0].data);
+                                if (!requested || !std::isfinite(*requested) || std::trunc(*requested) != *requested ||
+                                    *requested < 0.0 || *requested >= static_cast<double>(source->values.size()))
+                                    throw std::runtime_error("List pop index must be an in-range non-negative integer");
+                                index = static_cast<std::size_t>(*requested);
+                            }
+                            Value value = std::move(source->values[index]);
+                            source->values.erase(source->values.begin() + static_cast<std::ptrdiff_t>(index));
                             return value;
                         };
                     } else if (name == "contains") {
