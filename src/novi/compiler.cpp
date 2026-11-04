@@ -41,8 +41,14 @@ public:
 private:
     struct LoopContext {
         int continue_target = 0;
+        int scope_depth = 0;
         std::vector<int> break_jumps;
     };
+
+    void exit_scopes_to(int target_depth, const SourceSpan& span) {
+        for (int depth = scope_depth_; depth > target_depth; --depth)
+            emit(OpCode::ExitScope, 0, span);
+    }
 
     void emit(OpCode op, int operand, const SourceSpan& span, int operand2 = 0, int operand3 = 0) {
         function_->chunk.code.push_back({op, operand, span, operand2, operand3});
@@ -95,7 +101,9 @@ private:
             },
             [&](const BlockStmt& node) {
                 emit(OpCode::EnterScope, 0, statement.span);
+                ++scope_depth_;
                 for (const auto& child : node.statements) compile_statement(*child);
+                --scope_depth_;
                 emit(OpCode::ExitScope, 0, statement.span);
             },
             [&](const IfStmt& node) {
@@ -117,7 +125,7 @@ private:
                 const int exit_jump = static_cast<int>(function_->chunk.code.size());
                 emit(OpCode::JumpIfFalse, -1, node.condition->span);
                 emit(OpCode::Pop, 0, node.condition->span);
-                loops_.push_back({loop_start, {}});
+                loops_.push_back({loop_start, scope_depth_, {}});
                 compile_statement(*node.body);
                 LoopContext loop = std::move(loops_.back());
                 loops_.pop_back();
@@ -128,13 +136,14 @@ private:
             },
             [&](const ForEachStmt& node) {
                 emit(OpCode::EnterScope, 0, statement.span);
+                ++scope_depth_;
                 compile_expression(*node.iterable);
                 emit(OpCode::IteratorInit, 0, node.iterable->span);
                 const int loop_start = static_cast<int>(function_->chunk.code.size());
                 const int next_instruction = static_cast<int>(function_->chunk.code.size());
                 emit(OpCode::IteratorNext, add_constant(node.names.front()), statement.span,
                      -1, node.names.size() > 1 ? add_constant(node.names[1]) : -1);
-                loops_.push_back({loop_start, {}});
+                loops_.push_back({loop_start, scope_depth_, {}});
                 compile_statement(*node.body);
                 LoopContext loop = std::move(loops_.back());
                 loops_.pop_back();
@@ -144,6 +153,7 @@ private:
                 const int cleanup_target = static_cast<int>(function_->chunk.code.size());
                 emit(OpCode::Pop, 0, statement.span);
                 emit(OpCode::ExitScope, 0, statement.span);
+                --scope_depth_;
                 for (const int jump : loop.break_jumps)
                     function_->chunk.code[static_cast<std::size_t>(jump)].operand = cleanup_target;
             },
@@ -159,11 +169,13 @@ private:
                 emit(OpCode::Return, 0, statement.span);
             },
             [&](const BreakStmt&) {
+                exit_scopes_to(loops_.back().scope_depth, statement.span);
                 const int jump = static_cast<int>(function_->chunk.code.size());
                 emit(OpCode::Jump, -1, statement.span);
                 loops_.back().break_jumps.push_back(jump);
             },
             [&](const ContinueStmt&) {
+                exit_scopes_to(loops_.back().scope_depth, statement.span);
                 emit(OpCode::Jump, loops_.back().continue_target, statement.span);
             },
             [&](const ThrowStmt& node) {
@@ -338,6 +350,7 @@ private:
 
     std::shared_ptr<FunctionPrototype> function_;
     std::vector<LoopContext> loops_;
+    int scope_depth_ = 0;
 };
 
 }  // namespace
