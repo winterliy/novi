@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <optional>
 #include <ostream>
 #include <sstream>
 
@@ -12,6 +13,19 @@ namespace {
 
 bool is_number(const Value& value) { return std::holds_alternative<double>(value.data); }
 bool is_string(const Value& value) { return std::holds_alternative<std::string>(value.data); }
+
+std::optional<std::string> string_character_at(const std::string& value, std::size_t target) {
+    std::size_t offset = 0;
+    std::size_t character = 0;
+    while (offset < value.size()) {
+        const std::size_t start = offset;
+        const auto lead = static_cast<unsigned char>(value[offset]);
+        const std::size_t width = lead < 0x80 ? 1 : lead < 0xE0 ? 2 : lead < 0xF0 ? 3 : 4;
+        offset = std::min(value.size(), offset + width);
+        if (character++ == target) return value.substr(start, offset - start);
+    }
+    return std::nullopt;
+}
 
 }  // namespace
 
@@ -367,7 +381,15 @@ Value VM::execute() {
                         *index >= static_cast<double>((*list)->values.size()))
                         fail("List index must be an in-range non-negative integer", instruction.span);
                     stack_.push_back((*list)->values[static_cast<std::size_t>(*index)]);
-                } else fail("Indexing requires a dictionary or list", instruction.span);
+                } else if (const auto* string = std::get_if<std::string>(&object.data)) {
+                    const auto* index = std::get_if<double>(&key.data);
+                    if (!index || !std::isfinite(*index) || std::trunc(*index) != *index || *index < 0.0 ||
+                        *index >= static_cast<double>(string->size()))
+                        fail("String index must be an in-range non-negative integer", instruction.span);
+                    const auto character = string_character_at(*string, static_cast<std::size_t>(*index));
+                    if (!character) fail("String index is out of range", instruction.span);
+                    stack_.emplace_back(*character);
+                } else fail("Indexing requires a dictionary, list, or string", instruction.span);
                 break;
             }
             case OpCode::SetIndex: {
