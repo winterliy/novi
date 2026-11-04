@@ -27,6 +27,18 @@ std::optional<std::string> string_character_at(const std::string& value, std::si
     return std::nullopt;
 }
 
+std::size_t string_codepoint_count(const std::string& value) {
+    std::size_t offset = 0;
+    std::size_t count = 0;
+    while (offset < value.size()) {
+        const auto lead = static_cast<unsigned char>(value[offset]);
+        const std::size_t width = lead < 0x80 ? 1 : lead < 0xE0 ? 2 : lead < 0xF0 ? 3 : 4;
+        offset = std::min(value.size(), offset + width);
+        ++count;
+    }
+    return count;
+}
+
 }  // namespace
 
 VM::VM(std::ostream& output) : output_(output) {
@@ -632,6 +644,19 @@ Value VM::execute() {
                             return Value(static_cast<double>(source->values.size()));
                         };
                     } else fail("Undefined queue method '" + name + "'", instruction.span);
+                    stack_.emplace_back(std::move(method));
+                    break;
+                }
+                if (const auto* string = std::get_if<std::string>(&object.data)) {
+                    const std::string name = name_at(frame, instruction.operand, instruction.span);
+                    if (name != "length") fail("Undefined string method '" + name + "'", instruction.span);
+                    auto method = std::make_shared<NativeFunction>();
+                    method->name = "string.length";
+                    method->arity = 0;
+                    const std::size_t length = string_codepoint_count(*string);
+                    method->callback = [length](VM&, const std::vector<Value>&, const SourceSpan&) {
+                        return Value(static_cast<double>(length));
+                    };
                     stack_.emplace_back(std::move(method));
                     break;
                 }

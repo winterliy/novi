@@ -5,6 +5,7 @@ names.append('Ada');
 names.append('Grace');
 console.print(names[0]:string);
 console.print('Novi'[1]:string);
+console.print('안녕'.length():string);
 
 foreach (name in names) {
     console.print(name:string);
