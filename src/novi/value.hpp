@@ -32,6 +32,7 @@ struct DictionaryIteratorObject;
 struct SequenceIteratorObject;
 struct SetObject;
 struct QueueObject;
+struct TupleObject;
 
 class RuntimeError : public std::runtime_error {
 public:
@@ -50,7 +51,7 @@ struct Value {
                                  std::shared_ptr<IteratorObject>, std::shared_ptr<ListObject>,
                                  std::shared_ptr<DictionaryObject>, std::shared_ptr<DictionaryIteratorObject>,
                                  std::shared_ptr<SequenceIteratorObject>, std::shared_ptr<SetObject>,
-                                 std::shared_ptr<QueueObject>>;
+                                 std::shared_ptr<QueueObject>, std::shared_ptr<TupleObject>>;
     Storage data;
 
     Value() = default;
@@ -72,11 +73,13 @@ struct Value {
     Value(std::shared_ptr<SequenceIteratorObject> value) : data(std::move(value)) {}
     Value(std::shared_ptr<SetObject> value) : data(std::move(value)) {}
     Value(std::shared_ptr<QueueObject> value) : data(std::move(value)) {}
+    Value(std::shared_ptr<TupleObject> value) : data(std::move(value)) {}
 };
 
 struct ListObject { std::vector<Value> values; };
 struct SetObject { std::vector<Value> values; };
 struct QueueObject { std::deque<Value> values; };
+struct TupleObject { std::vector<Value> values; };
 
 struct DictionaryObject {
     std::vector<std::pair<Value, Value>> entries;
@@ -119,6 +122,7 @@ struct NativeFunction {
     using Callback = std::function<Value(VM&, const std::vector<Value>&, const SourceSpan&)>;
     std::string name;
     std::size_t arity = 0;
+    bool variadic = false;
     Callback callback;
 };
 

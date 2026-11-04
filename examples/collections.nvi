@@ -7,6 +7,13 @@ console.print(names[0]:string);
 console.print('Novi'[1]:string);
 console.print('안녕'.length():string);
 
+let point : tuple = tuple(3, 5);
+console.print(point[0]:string);
+console.print(point.length():string);
+foreach (coordinate in point) {
+    console.print(coordinate:string);
+}
+
 foreach (name in names) {
     console.print(name:string);
 }

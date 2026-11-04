@@ -98,6 +98,15 @@ VM::VM(std::ostream& output) : output_(output) {
     define_native("queue", 0, [](VM&, const std::vector<Value>&, const SourceSpan&) {
         return Value(std::make_shared<QueueObject>());
     });
+    auto tuple_native = std::make_shared<NativeFunction>();
+    tuple_native->name = "tuple";
+    tuple_native->variadic = true;
+    tuple_native->callback = [](VM&, const std::vector<Value>& arguments, const SourceSpan&) {
+        auto tuple = std::make_shared<TupleObject>();
+        tuple->values = arguments;
+        return Value(std::move(tuple));
+    };
+    globals_->define("tuple", Value(std::move(tuple_native)));
 }
 
 std::shared_ptr<Environment> VM::make_environment(std::shared_ptr<Environment> parent) {
@@ -167,7 +176,7 @@ void VM::push_frame(const std::shared_ptr<FunctionObject>& function,
 void VM::call_value(Value callee, std::vector<Value> arguments, const SourceSpan& span) {
     const std::size_t base = stack_.size();
     if (const auto* native = std::get_if<std::shared_ptr<NativeFunction>>(&callee.data)) {
-        if (arguments.size() != (*native)->arity) {
+        if (!(*native)->variadic && arguments.size() != (*native)->arity) {
             fail("Native function '" + (*native)->name + "' expects " + std::to_string((*native)->arity) +
                  " argument(s), got " + std::to_string(arguments.size()), span);
         }
@@ -296,7 +305,10 @@ Value VM::execute() {
                     if (!*queue) fail("Invalid queue", instruction.span);
                     stack_.emplace_back(std::make_shared<SequenceIteratorObject>(
                         std::vector<Value>((*queue)->values.begin(), (*queue)->values.end())));
-                } else fail("foreach expects a range, list, set, queue, or dictionary", instruction.span);
+                } else if (const auto* tuple = std::get_if<std::shared_ptr<TupleObject>>(&iterable.data)) {
+                    if (!*tuple) fail("Invalid tuple", instruction.span);
+                    stack_.emplace_back(std::make_shared<SequenceIteratorObject>((*tuple)->values));
+                } else fail("foreach expects a range, list, tuple, set, queue, or dictionary", instruction.span);
                 break;
             }
             case OpCode::IteratorNext: {
@@ -401,7 +413,13 @@ Value VM::execute() {
                     const auto character = string_character_at(*string, static_cast<std::size_t>(*index));
                     if (!character) fail("String index is out of range", instruction.span);
                     stack_.emplace_back(*character);
-                } else fail("Indexing requires a dictionary, list, or string", instruction.span);
+                } else if (const auto* tuple = std::get_if<std::shared_ptr<TupleObject>>(&object.data)) {
+                    const auto* index = std::get_if<double>(&key.data);
+                    if (!*tuple || !index || !std::isfinite(*index) || std::trunc(*index) != *index || *index < 0.0 ||
+                        *index >= static_cast<double>((*tuple)->values.size()))
+                        fail("Tuple index must be an in-range non-negative integer", instruction.span);
+                    stack_.push_back((*tuple)->values[static_cast<std::size_t>(*index)]);
+                } else fail("Indexing requires a dictionary, list, tuple, or string", instruction.span);
                 break;
             }
             case OpCode::SetIndex: {
@@ -417,6 +435,8 @@ Value VM::execute() {
                         *index >= static_cast<double>((*list)->values.size()))
                         fail("List index must be an in-range non-negative integer", instruction.span);
                     (*list)->values[static_cast<std::size_t>(*index)] = value;
+                } else if (std::holds_alternative<std::shared_ptr<TupleObject>>(object.data)) {
+                    fail("Tuples are immutable", instruction.span);
                 } else fail("Indexed assignment requires a dictionary or list", instruction.span);
                 stack_.push_back(std::move(value));
                 break;
@@ -656,6 +676,20 @@ Value VM::execute() {
                     const std::size_t length = string_codepoint_count(*string);
                     method->callback = [length](VM&, const std::vector<Value>&, const SourceSpan&) {
                         return Value(static_cast<double>(length));
+                    };
+                    stack_.emplace_back(std::move(method));
+                    break;
+                }
+                if (const auto* tuple = std::get_if<std::shared_ptr<TupleObject>>(&object.data)) {
+                    const std::string name = name_at(frame, instruction.operand, instruction.span);
+                    if (!*tuple) fail("Invalid tuple", instruction.span);
+                    if (name != "length") fail("Undefined tuple method '" + name + "'", instruction.span);
+                    auto method = std::make_shared<NativeFunction>();
+                    method->name = "tuple.length";
+                    method->arity = 0;
+                    const double length = static_cast<double>((*tuple)->values.size());
+                    method->callback = [length](VM&, const std::vector<Value>&, const SourceSpan&) {
+                        return Value(length);
                     };
                     stack_.emplace_back(std::move(method));
                     break;

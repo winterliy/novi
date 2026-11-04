@@ -81,7 +81,7 @@ tasks.enqueue('parse');
 vari task : string = tasks.dequeue();
 ```
 
-초기 동작은 list 삽입 순서 유지, set 중복 무시, queue FIFO 순서다. 세 컨테이너 모두 `length()`를 제공한다. 빈 queue의 `dequeue()`는 런타임 오류다. list·set·queue 순회는 시작 시점의 값을 복사한다. 일반 list literal, tuple 생성/불변성, set 제거 메서드 등은 후속 결정 항목이다.
+초기 동작은 list 삽입 순서 유지, set 중복 무시, queue FIFO 순서다. 이 컨테이너들은 `length()`를 제공한다. 빈 queue의 `dequeue()`는 런타임 오류다. list·tuple·set·queue 순회는 시작 시점의 값을 복사한다. `tuple(a, b, ...)`는 가변 인수 생성자이며, tuple은 생성 뒤 인덱스 대입이 불가능하다. tuple literal과 구조 분해 문법은 후속 결정 항목이다.
 
 `range(start, step, stop)`은 시작값부터 간격만큼 증가/감소하는 지연 수열을 만든다. Python의 range처럼 `stop`은 포함하지 않으며, `step`은 0일 수 없다. 음수 간격은 역방향 수열이다. 현재 실행기 첫 지원은 정수 인수 범위로 제한한다.
 
@@ -195,7 +195,7 @@ vari double : = function {x} then output(x * 2);
 - 변수 스코프(블록/함수/모듈/전역): **Novi => ""**
 - 이름 가리기(shadowing) 허용 여부 및 처리: **Novi => ""**
 
-현재 VM은 `boolean`, `string`, `integer`, `natural`, `nonint`, `realn`, `decimal`, `scalar`, `null`/`none`, `nan`, `list`, `dictionary`, `set`, `queue`, `range`의 선언 타입을 검사하며, 같은 타입 규칙을 재대입 때도 적용한다. `complex`, `imaginary`, exact `Rational`/`Irrational`, `tuple`, `vector`, `matrix`, `tensor`, `undefined`는 값 표현과 연산 규칙이 구현되기 전까지 지원 타입으로 처리하지 않는다. 이 단계는 실행 시 검사이며, 정적 의미 분석은 후속 단계다.
+현재 VM은 `boolean`, `string`, `integer`, `natural`, `nonint`, `realn`, `decimal`, `scalar`, `null`/`none`, `nan`, `list`, `tuple`, `dictionary`, `set`, `queue`, `range`의 선언 타입을 검사하며, 같은 타입 규칙을 재대입 때도 적용한다. `complex`, `imaginary`, exact `Rational`/`Irrational`, `vector`, `matrix`, `tensor`, `undefined`는 값 표현과 연산 규칙이 구현되기 전까지 지원 타입으로 처리하지 않는다. 이 단계는 실행 시 검사이며, 정적 의미 분석은 후속 단계다.
 
 ### 1.2 상수 선언
 

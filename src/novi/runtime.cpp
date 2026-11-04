@@ -148,6 +148,17 @@ std::string value_to_string(const Value& value) {
         output << ']';
         return output.str();
     }
+    if (const auto* tuple = std::get_if<std::shared_ptr<TupleObject>>(&value.data)) {
+        std::ostringstream output;
+        output << "tuple(";
+        for (std::size_t i = 0; i < (*tuple)->values.size(); ++i) {
+            if (i) output << ", ";
+            output << value_to_string((*tuple)->values[i]);
+        }
+        if ((*tuple)->values.size() == 1) output << ',';
+        output << ')';
+        return output.str();
+    }
     if (const auto* iterator = std::get_if<std::shared_ptr<IteratorObject>>(&value.data)) {
         (void)iterator;
         return "<range iterator>";
@@ -191,8 +202,15 @@ bool values_equal(const Value& left, const Value& right) {
         return *value == std::get<std::shared_ptr<SequenceIteratorObject>>(right.data);
     if (const auto* value = std::get_if<std::shared_ptr<SetObject>>(&left.data))
         return *value == std::get<std::shared_ptr<SetObject>>(right.data);
-    return std::get<std::shared_ptr<QueueObject>>(left.data) ==
-        std::get<std::shared_ptr<QueueObject>>(right.data);
+    if (const auto* value = std::get_if<std::shared_ptr<QueueObject>>(&left.data))
+        return *value == std::get<std::shared_ptr<QueueObject>>(right.data);
+    const auto& tuple = std::get<std::shared_ptr<TupleObject>>(left.data);
+    const auto& other = std::get<std::shared_ptr<TupleObject>>(right.data);
+    if (*tuple == *other) return true;
+    if (!*tuple || !*other || (*tuple)->values.size() != (*other)->values.size()) return false;
+    for (std::size_t i = 0; i < (*tuple)->values.size(); ++i)
+        if (!values_equal((*tuple)->values[i], (*other)->values[i])) return false;
+    return true;
 }
 
 bool value_matches_type(const Value& value, const std::string& type_name) {
@@ -216,6 +234,7 @@ bool value_matches_type(const Value& value, const std::string& type_name) {
     if (type_name == "dictionary") return std::holds_alternative<std::shared_ptr<DictionaryObject>>(value.data);
     if (type_name == "set") return std::holds_alternative<std::shared_ptr<SetObject>>(value.data);
     if (type_name == "queue") return std::holds_alternative<std::shared_ptr<QueueObject>>(value.data);
+    if (type_name == "tuple") return std::holds_alternative<std::shared_ptr<TupleObject>>(value.data);
     if (type_name == "range") return std::holds_alternative<std::shared_ptr<RangeObject>>(value.data);
     if (const auto* instance = std::get_if<std::shared_ptr<InstanceObject>>(&value.data))
         return *instance && (*instance)->klass->name == type_name;
