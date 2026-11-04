@@ -8,6 +8,9 @@ console.print(names.contains('Grace'):string);
 console.print(names.remove('Ada'):string);
 console.print('Novi'[1]:string);
 console.print('안녕'.length():string);
+foreach (character in '안녕') {
+    console.print(character:string);
+}
 
 let point : tuple = tuple(3, 5);
 console.print(point[0]:string);

@@ -308,7 +308,18 @@ Value VM::execute() {
                 } else if (const auto* tuple = std::get_if<std::shared_ptr<TupleObject>>(&iterable.data)) {
                     if (!*tuple) fail("Invalid tuple", instruction.span);
                     stack_.emplace_back(std::make_shared<SequenceIteratorObject>((*tuple)->values));
-                } else fail("foreach expects a range, list, tuple, set, queue, or dictionary", instruction.span);
+                } else if (const auto* string = std::get_if<std::string>(&iterable.data)) {
+                    std::vector<Value> characters;
+                    std::size_t offset = 0;
+                    while (offset < string->size()) {
+                        const std::size_t start = offset;
+                        const auto lead = static_cast<unsigned char>((*string)[offset]);
+                        const std::size_t width = lead < 0x80 ? 1 : lead < 0xE0 ? 2 : lead < 0xF0 ? 3 : 4;
+                        offset = std::min(string->size(), offset + width);
+                        characters.emplace_back(string->substr(start, offset - start));
+                    }
+                    stack_.emplace_back(std::make_shared<SequenceIteratorObject>(std::move(characters)));
+                } else fail("foreach expects a range, list, tuple, set, queue, string, or dictionary", instruction.span);
                 break;
             }
             case OpCode::IteratorNext: {
