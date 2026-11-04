@@ -1,6 +1,7 @@
 #include "vm.hpp"
 
 #include <cmath>
+#include <cstdint>
 #include <ostream>
 #include <sstream>
 
@@ -14,9 +15,27 @@ bool is_string(const Value& value) { return std::holds_alternative<std::string>(
 
 VM::VM(std::ostream& output) : output_(output) {
     globals_ = make_environment();
-    define_native("print", 1, [this](VM&, const std::vector<Value>& arguments, const SourceSpan&) {
+    define_native("print", 1, [](VM&, const std::vector<Value>& arguments, const SourceSpan&) {
         output_ << value_to_string(arguments.front()) << '\n';
         return Value{};
+    });
+    define_native("mod", 2, [](VM&, const std::vector<Value>& arguments, const SourceSpan&) {
+        const auto* left = std::get_if<double>(&arguments[0].data);
+        const auto* right = std::get_if<double>(&arguments[1].data);
+        if (!left || !right) throw std::runtime_error("mod(a, b) expects numeric arguments");
+        if (*right == 0.0) throw std::runtime_error("Modulo by zero");
+        return Value(std::fmod(*left, *right));
+    });
+    define_native("istrue", 1, [](VM&, const std::vector<Value>& arguments, const SourceSpan&) {
+        return Value(value_is_truthy(arguments.front()));
+    });
+    define_native("string", 1, [](VM&, const std::vector<Value>& arguments, const SourceSpan&) {
+        return Value(value_to_string(arguments.front()));
+    });
+    define_native("integer", 1, [](VM&, const std::vector<Value>& arguments, const SourceSpan&) {
+        const auto* number = std::get_if<double>(&arguments.front().data);
+        if (!number) throw std::runtime_error("integer(value) expects a number");
+        return Value(std::trunc(*number));
     });
 }
 
@@ -184,6 +203,11 @@ Value VM::execute() {
                 break;
             }
             case OpCode::Not: stack_.emplace_back(!value_is_truthy(pop(instruction.span))); break;
+            case OpCode::BitNot: {
+                const double number = require_number(pop(instruction.span));
+                stack_.emplace_back(static_cast<double>(~static_cast<std::int64_t>(number)));
+                break;
+            }
             case OpCode::Add: {
                 Value right = pop(instruction.span);
                 Value left = pop(instruction.span);
@@ -193,6 +217,9 @@ Value VM::execute() {
                 break;
             }
             case OpCode::Subtract: case OpCode::Multiply: case OpCode::Divide:
+            case OpCode::FloorDivide: case OpCode::Modulo:
+            case OpCode::BitwiseAnd: case OpCode::BitwiseOr: case OpCode::BitwiseXor:
+            case OpCode::ShiftLeft: case OpCode::ShiftRight:
             case OpCode::Less: case OpCode::LessEqual: case OpCode::Greater: case OpCode::GreaterEqual: {
                 const double right = require_number(pop(instruction.span));
                 const double left = require_number(pop(instruction.span));
@@ -201,6 +228,24 @@ Value VM::execute() {
                 else if (instruction.op == OpCode::Divide) {
                     if (right == 0.0) fail("Division by zero", instruction.span);
                     stack_.emplace_back(left / right);
+                } else if (instruction.op == OpCode::FloorDivide) {
+                    if (right == 0.0) fail("Division by zero", instruction.span);
+                    stack_.emplace_back(std::floor(left / right));
+                } else if (instruction.op == OpCode::Modulo) {
+                    if (right == 0.0) fail("Modulo by zero", instruction.span);
+                    stack_.emplace_back(std::fmod(left, right));
+                } else if (instruction.op == OpCode::BitwiseAnd || instruction.op == OpCode::BitwiseOr ||
+                           instruction.op == OpCode::BitwiseXor || instruction.op == OpCode::ShiftLeft ||
+                           instruction.op == OpCode::ShiftRight) {
+                    const auto lhs = static_cast<std::int64_t>(left);
+                    const auto rhs = static_cast<std::int64_t>(right);
+                    if ((instruction.op == OpCode::ShiftLeft || instruction.op == OpCode::ShiftRight) &&
+                        (rhs < 0 || rhs >= 63)) fail("Shift count must be between 0 and 62", instruction.span);
+                    if (instruction.op == OpCode::BitwiseAnd) stack_.emplace_back(static_cast<double>(lhs & rhs));
+                    else if (instruction.op == OpCode::BitwiseOr) stack_.emplace_back(static_cast<double>(lhs | rhs));
+                    else if (instruction.op == OpCode::BitwiseXor) stack_.emplace_back(static_cast<double>(lhs ^ rhs));
+                    else if (instruction.op == OpCode::ShiftLeft) stack_.emplace_back(static_cast<double>(lhs << rhs));
+                    else stack_.emplace_back(static_cast<double>(lhs >> rhs));
                 } else if (instruction.op == OpCode::Less) stack_.emplace_back(left < right);
                 else if (instruction.op == OpCode::LessEqual) stack_.emplace_back(left <= right);
                 else if (instruction.op == OpCode::Greater) stack_.emplace_back(left > right);
@@ -212,6 +257,15 @@ Value VM::execute() {
                 const Value left = pop(instruction.span);
                 const bool equal = values_equal(left, right);
                 stack_.emplace_back(instruction.op == OpCode::Equal ? equal : !equal);
+                break;
+            }
+            case OpCode::LogicalAnd: case OpCode::LogicalOr: {
+                const Value right = pop(instruction.span);
+                const Value left = pop(instruction.span);
+                const bool result = instruction.op == OpCode::LogicalAnd
+                    ? value_is_truthy(left) && value_is_truthy(right)
+                    : value_is_truthy(left) || value_is_truthy(right);
+                stack_.emplace_back(result);
                 break;
             }
             case OpCode::Jump:

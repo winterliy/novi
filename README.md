@@ -1,13 +1,13 @@
 # Novi
 
-Novi is an experimental C++ language implementation. Its backend foundation includes source spans and diagnostics, a syntax-neutral AST, bytecode compilation, and a stack-based interpreter VM with function and class runtime objects. The surface parser is deliberately limited to calculator expressions until the Novi syntax decisions in [`docs/tasks/novi-language-front-end.md`](docs/tasks/novi-language-front-end.md) are filled in.
+Novi is an experimental C/C++ language implementation focused on optimizing the programs it compiles. C++ is used for the compiler, VM, and object runtime; C is reserved for system APIs and stable native interfaces. Assembly may be added only for measured CPU-specific bottlenecks, with a C++ fallback. Novi-language source files use the `.nvi` extension. The compiler currently connects basic expressions, declarations, functions, conditionals, loops, and class/method syntax to the bytecode VM; some type, access-control, and module semantics are still incomplete.
 
 ## Build
 
 The project requires a C++17 compiler and CMake 3.16 or newer:
 
 ```sh
-cmake -S . -B build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
@@ -23,10 +23,11 @@ c++ -std=c++17 -Wall -Wextra -Wpedantic -Isrc \
 ## Run
 
 ```sh
-./build/novi
+./build/novi                 # interactive REPL
+./build/novi examples/hello.nvi
 ```
 
-Enter arithmetic expressions such as `1 + 2 * 3`; type `exit` to leave the REPL. The object/function bytecode model is available to compiler-generated modules, but class/function surface syntax and a resolver/type checker remain future work pending language decisions.
+Enter expressions such as `1 + 2 * 3`; type `exit` to leave the REPL. A `.nvi` file is parsed as one complete program, so declarations and brace blocks can span lines.
 
 ## Design tasks
 

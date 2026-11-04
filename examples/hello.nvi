@@ -1,0 +1,4 @@
+import {novi} from {novi};
+
+vari message : string = 'Hello from Novi';
+console.print(message);

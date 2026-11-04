@@ -74,6 +74,11 @@ private:
                 else emit(OpCode::Null, 0, statement.span);
                 emit(OpCode::DefineName, add_constant(node.name), statement.span);
             },
+            [&](const ReflexStmt& node) {
+                compile_expression(*node.value);
+                emit(OpCode::SetName, add_constant(node.target), statement.span);
+                emit(OpCode::Pop, 0, statement.span);
+            },
             [&](const BlockStmt& node) {
                 emit(OpCode::EnterScope, 0, statement.span);
                 for (const auto& child : node.statements) compile_statement(*child);
@@ -126,7 +131,9 @@ private:
                 }
                 function_->chunk.classes.push_back(std::move(klass));
                 emit(OpCode::DefineClass, static_cast<int>(function_->chunk.classes.size() - 1), statement.span);
-            }
+            },
+            [&](const ImportStmt&) {},
+            [&](const ExportStmt&) {}
         }, statement.node);
     }
 
@@ -150,7 +157,9 @@ private:
             },
             [&](const UnaryExpr& node) {
                 compile_expression(*node.operand);
-                emit(node.op == UnaryOperator::Negate ? OpCode::Negate : OpCode::Not, 0, expression.span);
+                const OpCode op = node.op == UnaryOperator::Negate ? OpCode::Negate :
+                    node.op == UnaryOperator::BitNot ? OpCode::BitNot : OpCode::Not;
+                emit(op, 0, expression.span);
             },
             [&](const BinaryExpr& node) {
                 compile_expression(*node.left);
@@ -161,6 +170,15 @@ private:
                     case BinaryOperator::Subtract: op = OpCode::Subtract; break;
                     case BinaryOperator::Multiply: op = OpCode::Multiply; break;
                     case BinaryOperator::Divide: op = OpCode::Divide; break;
+                    case BinaryOperator::FloorDivide: op = OpCode::FloorDivide; break;
+                    case BinaryOperator::Modulo: op = OpCode::Modulo; break;
+                    case BinaryOperator::LogicalAnd: op = OpCode::LogicalAnd; break;
+                    case BinaryOperator::LogicalOr: op = OpCode::LogicalOr; break;
+                    case BinaryOperator::BitwiseAnd: op = OpCode::BitwiseAnd; break;
+                    case BinaryOperator::BitwiseOr: op = OpCode::BitwiseOr; break;
+                    case BinaryOperator::BitwiseXor: op = OpCode::BitwiseXor; break;
+                    case BinaryOperator::ShiftLeft: op = OpCode::ShiftLeft; break;
+                    case BinaryOperator::ShiftRight: op = OpCode::ShiftRight; break;
                     case BinaryOperator::Equal: op = OpCode::Equal; break;
                     case BinaryOperator::NotEqual: op = OpCode::NotEqual; break;
                     case BinaryOperator::Less: op = OpCode::Less; break;
@@ -169,6 +187,19 @@ private:
                     case BinaryOperator::GreaterEqual: op = OpCode::GreaterEqual; break;
                 }
                 emit(op, 0, expression.span);
+            },
+            [&](const TernaryExpr& node) {
+                compile_expression(*node.condition);
+                const int false_jump = static_cast<int>(function_->chunk.code.size());
+                emit(OpCode::JumpIfFalse, -1, node.condition->span);
+                emit(OpCode::Pop, 0, node.condition->span);
+                compile_expression(*node.when_true);
+                const int end_jump = static_cast<int>(function_->chunk.code.size());
+                emit(OpCode::Jump, -1, expression.span);
+                patch_jump(false_jump);
+                emit(OpCode::Pop, 0, node.condition->span);
+                compile_expression(*node.when_false);
+                patch_jump(end_jump);
             },
             [&](const CallExpr& node) {
                 compile_expression(*node.callee);
@@ -183,6 +214,15 @@ private:
                 compile_expression(*node.object);
                 compile_expression(*node.value);
                 emit(OpCode::SetProperty, add_constant(node.name), expression.span);
+            },
+            [&](const LambdaExpr& node) {
+                auto nested = std::make_shared<FunctionPrototype>();
+                nested->name = "<lambda>";
+                nested->parameters = node.parameters;
+                nested->declaration_span = expression.span;
+                FunctionCompiler nested_compiler(nested);
+                auto compiled = nested_compiler.compile(node.body, expression.span);
+                emit(OpCode::MakeClosure, add_function(std::move(compiled)), expression.span);
             }
         }, expression.node);
     }

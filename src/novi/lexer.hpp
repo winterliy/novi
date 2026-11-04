@@ -7,7 +7,15 @@
 
 namespace novi {
 
-enum class TokenKind { Number, Plus, Minus, Star, Slash, LeftParen, RightParen, End };
+enum class TokenKind {
+    Identifier, Number, String,
+    Plus, Minus, Star, Slash, FloorSlash, Percent,
+    Ampersand, Pipe, LogicalAnd, LogicalOr, Caret, Tilde, ShiftLeft, ShiftRight,
+    Bang, Equal, EqualEqual, BangEqual, Less, LessEqual, Greater, GreaterEqual,
+    Question, Colon, Dot, Comma, Semicolon,
+    LeftParen, RightParen, LeftBrace, RightBrace,
+    At, Hash, End
+};
 
 struct Token {
     TokenKind kind;

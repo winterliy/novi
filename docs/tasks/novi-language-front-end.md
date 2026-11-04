@@ -6,11 +6,109 @@
 
 백엔드의 AST, 바이트코드, VM, 객체 모델은 [백엔드 작업 문서](novi-object-oriented-backend.md)에 있다. 프런트엔드 표기를 결정한 뒤 파서와 의미 검사를 그 결정에 맞춘다.
 
+Novi 언어로 작성한 소스 파일의 확장자는 `.nvi`다. 컴파일러/런타임 구현 파일은 C++ `.cpp`/`.hpp`로 유지한다. `novi path/to/file.nvi`는 파일 전체를 한 번에 파싱한다.
+
+## 사용자가 결정한 항목
+
+아래 표기는 현재 합의된 Novi 표면 문법이다. 의미 규칙이 비어 있는 부분은 임의로 확정하지 않고 후속 결정 항목에 남긴다.
+
+| 기능 | 결정된 Novi 표기 | 남은 의미 규칙 |
+|---|---|---|
+| 표준 라이브러리 import | `import {novi} from {novi};` | `novi`가 기본 제공하는 함수 목록 |
+| 사용자 모듈 import/export | `export {이름};` 및 `import {이름} from {모듈};` | export 묶음, 경로 해석, 이름 충돌 처리 |
+| Import alias | `import {} from {} like ('별명');`; `import {abc}=('별명');` | 두 alias 형태의 정확한 범위와 이름 규칙 |
+| Export 이름 alias | `export {} like ("별명");` | export 묶음과 별명의 범위 |
+| 산술 연산 | `+`, `-`, `*`, `/`, `%`, `//`, `mod(a,b)` | 우선순위, 타입 혼합; 음수 몫·나머지는 Python식 바닥 내림을 권장 |
+| 논리 연산 | `and`, `or`; `&`, `|`도 같은 논리 연산 | boolean 전용·단락 평가·boolean 반환을 권장 |
+| 비트 연산 | `&&`, `||`, `^`, `~`, `<<`, `>>` | 정수 폭, 부호, shift 범위 |
+| 대입·비교 | `=` 대입, `==` 같음, `!=`, 대소 비교, `is` 비교 | `is` 비교가 값 동등성·객체 동일성 중 무엇인지 |
+| 정규식 lookahead | `?=`는 정규식 전방탐색에만 사용 | `regex("패턴")` 안에서만 토큰화하도록 제안 |
+| 조건식 | `조건 ? 참일_때_값 : 거짓일_때_값` | 우선순위, 결과 타입 |
+| 조건문 | `is (조건식) { ... }`; `also (조건식) { ... }`; `isnothing; { ... }` | 블록 종료, `else if` 연결 문법; `if/elif/else`도 별칭으로 허용 |
+| 한 줄 조건문 | `is (조건식) then 명령;`; `if`도 같은 위치에 사용 | 여러 문장을 허용할지 |
+| 조건 반복 | 조건 블록 안 `reflex(값) 변수;` | 조건이 참인 동안 재평가하는 반복으로 제안; 종료 방향과 값 전달 규칙 |
+| Boolean 검사 | `istrue(조건식)`은 `true` 또는 `false` 반환 | 조건식 타입 |
+| 출력 | `console.print(값)` | 여러 인수, 줄바꿈 |
+| 함수 선언 | `function NAME (인자) { ... }` | C식 사전 선언(prototype)을 별도 지원할지, 인자 타입/반환 타입 표기 |
+| Lambda | `function {인자} then 명령;` | 표현식 반환, 여러 문장 lambda, 캡처 규칙 |
+| 함수 반환 | `output(값)` 또는 `return(값)` | 둘 다 같은 반환 기능; 값 생략 허용 여부 |
+| 클래스/공유 멤버 | `class`, `static` | 생성자·상속·초기화 규칙 |
+| 메타데이터 | `@` | `@` 뒤 문법과 컴파일러가 처리할 metadata 목록 |
+| 비동기 | `async`, `await` | 반환 타입, 오류 전파, 취소·스케줄러 규칙 |
+| 접근 제어 | 클래스 기본 공개, `#` 또는 `private`는 비공개, `public` 명시 가능 | `#`의 멤버 접두 문법과 상속 접근 규칙 |
+
+변수와 문자열 표기는 다음과 같이 정했다.
+
+```text
+vari amount : integer = 3          // 명시한 타입은 고정
+vari amount : = integer(3)         // 타입을 고정하지 않고 현재 값만 변환
+constant amount                    // 기존 변수를 상수로 고정
+vari first : = string('text')      // 작은따옴표 문자열
+vari second : = string("text")     // 큰따옴표 문자열
+```
+
+위 두 문자열 따옴표는 모두 문자열이다. 타입이 `:`와 `=` 사이에 적히면 변수 타입을 고정하고, `: = Type(value)` 형식이면 나중에 다른 타입 값으로 바꿀 수 있다. `constant NAME`은 이미 선언된 변수를 재할당 불가로 만든다는 해석으로 기록한다.
+
+사용자 모듈은 `export`로 내보낸 이름만 다른 파일에서 `import`할 수 있다. 기본 라이브러리는 컴파일러/런타임이 제공하므로 매번 `export` 선언을 작성하지 않는다. 기본 형태와 alias 예시는 다음과 같다.
+
+```text
+import {novi} from {novi};                  // 기본 라이브러리
+import {abc} from {"./module.nv"};          // export된 이름 가져오기
+import {} from {"./module.nv"} like ('별명');
+import {abc}=('별명');
+export {abc};
+export {} like ("별명");
+```
+
+import/export 문장에는 세미콜론을 붙인다. `import {abc}=('별명')`가 가져온 `abc` 자체의 별칭인지, 모듈 이름의 별칭인지는 아직 정하지 않았다. `export {} like ("별명")`의 별명이 내보낸 심볼 묶음의 이름인지 모듈 이름인지도 정해야 한다. 별명 따옴표는 작은따옴표와 큰따옴표를 문자열로 허용한다.
+
+산술 연산 기호는 `+`, `-`, `*`, `/`를 그대로 쓰기로 했다. 논리 연산자는 `and`, `or`다. 조건문은 `is`가 기본 표기이며 `if/elif/else`도 `is/also/isnothing` 대신 쓸 수 있다.
+
+예시 모양:
+
+```text
+is (istrue(조건식)) {
+    console.print("조건이 참");
+} isnothing; {
+    console.print("조건이 거짓");
+}
+```
+
+`istrue(...)`는 조건을 검사해 `true`/`false` 값을 돌려주는 식이다. `is (...) { ... }`는 본문을 실행하는 조건문이다. `if/elif/else`도 각각 `is/also/isnothing` 자리에 쓸 수 있다. `console.print`는 기본 제공 출력 함수 호출이며, `output(...)`과 `return(...)`은 같은 반환 문장이다. 작은따옴표와 큰따옴표는 모두 문자열 리터럴이다.
+
+한 줄 조건문은 조건이 참일 때 `then` 뒤의 명령 하나를 실행한다. 블록형과 함께 사용할 수 있다.
+
+```text
+is (a == 10) then console.print(a);
+if (a == 10) then console.print(a);
+```
+
+조건식에서 `=`는 대입이므로 값의 같음을 검사할 때 `==`를 쓴다. 여러 명령이 필요하면 `{ ... }` 블록을 쓴다.
+
+`reflex(value) target;`은 현재 조건문 블록에서 계산한 다음 값을 `target` 변수에 넣고 조건을 다시 검사하는 제어 구문으로 제안한다. 조건이 참인 동안 블록을 반복하고, 거짓이면 빠져나오는 형태다.
+
+```text
+is (a < 10) {
+    console.print(a);
+    reflex(a + 1) a;
+}
+```
+
+위 예시는 `a`를 1씩 증가시키며 조건을 재검사한다. `reflex`를 실행하는 모든 경로가 다음 값을 제공해야 하는지, 여러 변수를 갱신할 수 있는지는 정해야 한다. 조건이 처음부터 거짓이면 블록과 `reflex`를 실행하지 않는다.
+
+Lambda는 `function {인자} then 명령;` 형태의 익명 함수 식으로 제안한다.
+
+```text
+vari double : = function {x} then output(x * 2);
+```
+
+이 문법에서 `output(...)`은 lambda의 반환값을 정한다는 안이다. 반환 표현식 생략, 여러 문장, 캡처는 미정이다.
+
 ## 작성 규칙
 
 - `Novi => ""`만 사용자가 채운다. 다른 언어 예시는 참고용이다.
 - 표기뿐 아니라 **규칙**도 정한다. 예: 재할당 가능 여부, 스코프, 우선순위, 오류 조건.
-- 키워드 문법과 표준 라이브러리 함수를 구분한다. `print`가 예약어인지 보통 함수인지 정한다.
+- 키워드 문법과 기본 제공 함수를 구분한다. `console.print(...)`는 기본 제공 출력 함수 호출로 정했다.
 - 한 항목을 결정할 때 짧은 Novi 코드, 실행 결과, 잘못된 코드의 처리도 함께 적는다.
 - 기능의 일부만 지원할 경우 지원 범위를 제한한다. 예: Java의 모든 annotation이나 C++의 모든 전처리 동작을 처음부터 구현할 필요는 없다.
 
@@ -27,12 +125,13 @@
 | Go | `name := value` 또는 `var name Type` |
 | JavaScript | `let name = value;` |
 | TypeScript | `let name: Type = value;` |
-| **Novi** | `=> ""` |
+| **Novi** | `vari NAME : TYPE = VALUE` 또는 `vari NAME : = TYPE(VALUE)` |
 
-- 재선언 규칙: **Novi => ""**
-- 선언과 초기화를 분리할 수 있는가: **Novi => ""**
-- 초기값 생략 시 값 또는 오류: **Novi => ""**
-- 재할당 가능한 변수와 읽기 전용 변수 표기: **Novi => ""**
+- `vari NAME : TYPE = VALUE`는 선언한 TYPE으로 고정한다.
+- `vari NAME : = TYPE(VALUE)`는 고정 타입 없이 지정 타입의 값으로 초기화한다.
+- 타입을 쓰지 않은 변수는 다른 타입의 값으로 바꿀 수 있다. 예: `vari a : = string('asdf')` 다음에 `vari a : = integer(3)`.
+- 기존 변수에 `vari` 없이 값을 재할당하는 축약 문법: **Novi => ""**
+- 선언과 초기화 분리 및 초기값 생략: **Novi => ""**
 - 변수 스코프(블록/함수/모듈/전역): **Novi => ""**
 - 이름 가리기(shadowing) 허용 여부 및 처리: **Novi => ""**
 
@@ -47,9 +146,9 @@
 | Go | `const limit = 10` |
 | JavaScript | `const limit = 10;` |
 | TypeScript | `const limit: number = 10;` |
-| **Novi** | `=> ""` |
+| **Novi** | `constant NAME` (이미 선언한 변수를 상수로 고정) |
 
-- 상수의 재할당 금지 범위(바인딩만/객체 내부까지): **Novi => ""**
+- 상수가 객체 내부 필드까지 고정하는지, 변수 binding만 고정하는지: **Novi => ""**
 - 컴파일 시 계산하는 상수 지원 여부: **Novi => ""**
 
 ### 1.3 타입 선언과 타입 별칭
@@ -67,7 +166,45 @@
 
 - Novi 타입 체계(정적/동적/점진적): **Novi => ""**
 - 타입 추론, 타입 검사 시점, 타입 별칭: **Novi => ""**
-- 기본 타입 이름과 의미: **Novi => ""**
+- 기본 타입 이름과 의미: 아래 2.1.1 초안 목록을 기준으로 겹치는 분류와 표현 방식을 결정한다.
+
+#### 1.3.1 제안된 타입 목록
+
+아래는 사용자가 제안한 이름을 보존한 목록이다. 이름을 바꾸거나 제거하지 않았으며, 분류 관계·저장 표현·규칙은 아직 미정이다.
+
+| 분류 | 제안된 Novi 타입 이름 | 결정해야 할 점 |
+|---|---|---|
+| 기본 값 | `boolean`, `string` | `boolean`의 표기 대소문자, 문자열 encoding/불변성 |
+| 숫자 묶음 | `scalar` | 수치 타입의 공통 상위 분류/제약인지 실제 저장 타입인지 |
+| 정수 계열 | `integer`, `nonint`, `natural` | `nonint`가 정수가 아닌 모든 수인지, integer/natural과의 포함 관계, bit width/부호/overflow, natural에 0 포함 여부 |
+| 실수 계열 | `realn`, `decimal`, `nrc`, `rc` | `realn`의 정확한 뜻, 이진 부동소수점과 십진수 구분, 유한/무한 소수 구분 |
+| 복소수 계열 | `complex`, `imaginary` | `complex(a,b)`에서 a=실수부·b=허수부, `imaginary`가 실수부 0인 복소수의 별칭/하위 타입인지 |
+| 수학적 수 분류 | `Rational`, `Irrational` | 값의 수학적 속성인지 저장 표현인지, exact 계산 지원 여부 |
+| 선형대수 | `vector`, `matrix`, `tensor` | rank/shape, 원소 타입, 연산 및 메모리 배치 |
+| 컬렉션 | `list`, `tuple`, `queue`, `dictionary`, `set` | 변경 가능성, 순서, 인덱스/키/중복/동등성 |
+| 특수 값 | `none`, `null`, `nan`, `undefined` | 각각의 의미 및 숫자 타입과의 관계 |
+
+표기 예시로 `complex(a,b)`를 제안했다. 여기서 `a`와 `b`의 표기 단위는 숫자 값이며 각각 실수부와 허수부다. 이 문서 예시는 아직 수학 연산의 정밀도나 자료형 강제를 결정하지 않는다.
+
+성능과 타입 체계를 위해서는 **저장 표현**과 **수학적 분류**를 분리하는 편이 좋다. 예를 들어 `integer`·`decimal`·`complex`는 값을 어떤 형식으로 저장/연산할지 정하는 타입 후보이고, `natural`·`Rational`·`Irrational`은 값의 수학적 성질 분류로 볼 수 있다. 한 값은 여러 성질을 동시에 가질 수 있으므로 이를 모두 서로 배타적인 런타임 타입으로 만들면 타입 검사와 연산 규칙이 복잡해질 수 있다.
+
+- 유한 소수(decimal expansion)는 유리수이며, 무한 순환 소수(`rc`)도 유리수다. 무한 비순환 소수(`nrc`)는 실수의 십진 표기 속성이고 통상 무리수에 해당한다. `Rational`/`Irrational`은 저장 형식과 구분해서 다룰지 결정한다.
+- 일반적인 유한 정밀도 binary float는 정확한 수학적 무리수를 보존하지 않는다. `Irrational` 값을 정확히 계산하려면 기호식/임의정밀도 방식이 필요하고, 근삿값 계산이면 정밀도와 오차 규칙을 정해야 한다.
+- `nan`은 숫자 연산의 특수 값으로 둘지 독립 타입/값으로 둘지, `null`·`none`·`undefined`가 각각 결측·미초기화·반환 없음 중 무엇을 뜻할지 구별해야 한다.
+- `vector`·`matrix`·`tensor`는 수치 연산을 위한 shape 있는 자료구조로, `list`·`tuple`·`queue`·`dictionary`·`set` 같은 일반 컬렉션과 원소 타입·연속 메모리·연산 규칙을 분리할지 결정한다.
+
+- 이름과 대소문자(`boolean`/`Boolean`, `Rational` 등): **Novi => ""**
+- `scalar`가 타입 생성자/상위 타입/namespace 중 무엇인지: **Novi => ""**
+- `realn`의 정의와 `nonint` 추가 여부: **Novi => ""**
+- scalar 계열 분류의 포함 관계와 상호 배타 여부: **Novi => ""**
+- 명시적 형 변환의 추가 표기와 변환 실패 규칙: **Novi => ""**
+- 유한 소수는 소수 자릿수 n에 대해 값×10^n 정수를 저장하고, 표시 시 scale을 적용하는 방식을 제안한다.
+- 위 표현은 scaled integer와 decimal scale n을 함께 저장한다. 값이 커지면 scaled integer의 폭과 연산 비용이 늘어난다.
+- 무한 순환 소수는 정수부·비순환 소수부·순환 주기와 주기 표시를 함께 저장하는 방식을 제안한다. 정확한 사칙연산을 위해서는 이 구조 외에 정규화된 분자/분모 표현을 함께 쓸지도 검토한다.
+- 순환하지 않는 무한소수의 모든 자릿수를 유한 메모리에 정확히 저장할 수는 없다. 임의정밀도 근삿값과 오차 경계, 또는 기호식 표현 중에서 선택해야 한다.
+- 반복소수는 반복부만 저장해 표기 자체를 보존할 수 있지만, 정확한 산술 연산을 위해 정규화한 분자/분모 형태가 필요할 수 있다.
+- 무한 비순환 소수의 연산 정밀도·반올림 규칙: **Novi => ""**
+- 숫자 크기에 따라 고정 폭 정수, 임의정밀도 정수, decimal scale 저장 중 선택하는 기준: **Novi => ""**
 
 ### 1.4 문장, 블록, 주석, 이름
 
@@ -92,11 +229,11 @@
 
 | 값 | Python | Java | C++ | Go | JavaScript / TypeScript | **Novi** |
 |---|---|---|---|---|---|---|
-| 정수 | `42` | `42` | `42` | `42` | `42` | `=> ""` |
-| 소수 | `3.14` | `3.14` | `3.14` | `3.14` | `3.14` | `=> ""` |
-| 문자열 | `'hi'`, `"hi"` | `"hi"` | `"hi"` | `"hi"` | `'hi'`, `"hi"`, `` `hi` `` | `=> ""` |
+| 정수 | `42` | `42` | `42` | `42` | `42` | `42` (타입 선언 문법과 함께 결정) |
+| 소수 | `3.14` | `3.14` | `3.14` | `3.14` | `3.14` | `3.14` (정밀도/타입 추론 미정) |
+| 문자열 | `'hi'`, `"hi"` | `"hi"` | `"hi"` | `"hi"` | `'hi'`, `"hi"`, `` `hi` `` | `'hi'` 또는 `"hi"` |
 | 문자 | 길이 1 문자열 | `'a'` | `'a'` | `'a'` | 별도 문자 타입 없음 | `=> ""` |
-| 참/거짓 | `True`, `False` | `true`, `false` | `true`, `false` | `true`, `false` | `true`, `false` | `=> ""` |
+| 참/거짓 | `True`, `False` | `true`, `false` | `true`, `false` | `true`, `false` | `true`, `false` | `true`, `false` |
 | null 값 | `None` | `null` | `nullptr` | `nil` (특정 타입의 nil) | `null`, `undefined` | `=> ""` |
 | 배열/목록 | `[1, 2]` | `new int[]{1, 2}` / `List.of(1, 2)` | `std::array` / `std::vector` | `[]int{1, 2}` | `[1, 2]` | `=> ""` |
 | 맵 | `{"a": 1}` | `Map.of("a", 1)` | `std::map` 초기화 | `map[string]int{"a": 1}` | `{"a": 1}` | `=> ""` |
@@ -105,7 +242,7 @@
 
 - 정수 폭, 부호, 오버플로 처리: **Novi => ""**
 - 부동소수점 종류와 정밀도: **Novi => ""**
-- 정수 나눗셈, 나머지, 음수 나눗셈 규칙: **Novi => ""**
+- 정수 나눗셈의 결과 타입/0 나눗셈 처리와 Python식 음수 몫·나머지 권장안의 최종 확정: **Novi => ""**
 - 문자열 결합, 비교, 인덱싱, 길이 단위(바이트/코드포인트/문자소): **Novi => ""**
 - 배열/맵/집합의 변경 가능성, 순서, 동등성: **Novi => ""**
 - null과 초기화되지 않은 값의 구분: **Novi => ""**
@@ -114,24 +251,71 @@
 
 | 기능 | Python | Java / C++ / Go | JavaScript / TypeScript | **Novi** |
 |---|---|---|---|---|
-| 산술 | `+ - * / // % **` | `+ - * / %` (C++ 외 언어별 차이) | `+ - * / % **` | `=> ""` |
-| 대입 | `=` | `=` | `=` | `=> ""` |
-| 복합 대입 | `+=`, `-=`, ... | `+=`, `-=`, ... | `+=`, `-=`, ... | `=> ""` |
-| 비교 | `== != < <= > >=` | 유사 | 유사 | `=> ""` |
-| 논리 | `and or not` | `&& || !` | `&& || !` | `=> ""` |
-| 비트 | `& | ^ ~ << >>` | 유사 | 유사 | `=> ""` |
+| 산술 | `+ - * / // % **` | `+ - * / %` (C++ 외 언어별 차이) | `+ - * / % **` | `+`, `-`, `*`, `/`, `%`, `//`, `mod(a,b)` (확정) |
+| 대입 | `=` | `=` | `=` | `=` (확정) |
+| 복합 대입 | `+=`, `-=`, ... | `+=`, `-=`, ... | `+=`, `-=`, ... | `+=`, `-=` (확정) |
+| 비교 | `== != < <= > >=` | 유사 | 유사 | `==`, `!=`, `<`, `>`, `<=`, `>=`, `is` (의미와 문맥 미정) |
+| 논리 | `and or not` | `&& || !` | `&& || !` | `and`, `or`, `!`; `&`, `|`도 논리 별칭 (확정) |
+| 비트 | `& | ^ ~ << >>` | 유사 | 유사 | `&&`, `||`, `^`, `~`, `<<`, `>>` (확정) |
 | 증가/감소 | 없음 | `++ --` (Java/C++), Go는 별도 문장 | `++ --` | `=> ""` |
-| 조건 선택 | `a if c else b` | `c ? a : b` | `c ? a : b` | `=> ""` |
+| 조건 선택 | `a if c else b` | `c ? a : b` | `c ? a : b` | `조건 ? 참일_때_값 : 거짓일_때_값` (확정) |
 | null 대체/안전 접근 | 관용 패턴 | 언어·버전별 제공 | `??`, `?.` | `=> ""` |
 | 타입 검사/변환 | `isinstance`, 생성자 | cast/`instanceof` 등 | `typeof`, `instanceof` | `=> ""` |
 
 - 전체 연산자 우선순위 표: **Novi => ""**
 - 결합 방향 및 단항·대입 연산 규칙: **Novi => ""**
-- `and`/`or` 계열의 단락 평가 여부: **Novi => ""**
+- `and`/`or`와 별칭 `&`/`|`는 boolean만 받고 boolean을 반환하며 단락 평가하는 안을 권한다. truthy/falsy 입력은 허용하지 않는 쪽을 권한다.
 - 객체의 `==`와 동일 객체 비교를 구분하는가: **Novi => ""**
-- truthy/falsy 허용 여부와 조건식 타입: **Novi => ""**
+- truthy/falsy 허용 여부는 미정이며, 논리 연산과 조건은 boolean만 받는 안을 권한다.
 - 암시적 형변환, 숫자/문자열 혼합 연산 처리: **Novi => ""**
 - 연산자 오버로딩 허용 여부: **Novi => ""**
+
+#### 연산자 표기 충돌
+
+- `=`는 대입, `==`는 같음 비교, `?=`는 정규식 전방탐색으로 확정됐다.
+- `&`/`|`는 `and`/`or`의 논리 별칭이며, `&&`/`||`는 비트 연산이다. C 계열 관례와 반대이므로 parser, formatter, 진단 문구가 같은 규칙을 따라야 한다.
+- `is`는 조건문 시작과 비교 양쪽에 쓰인다. `is (조건) {`처럼 block이 오는 문맥과 `left is right` 식 문맥을 파서에서 구분한다. 비교의 의미가 동등성인지 객체 동일성인지는 미정이다.
+- 음수 몫·나머지는 Python처럼 `//`를 바닥 내림으로, `%` 결과 부호는 제수와 같게 하는 규칙을 권한다. `mod(a,b)`도 `%` 별칭으로 두면 의미가 하나로 정리된다.
+
+### 2.3 비트 연산
+
+| 연산 | 제안 표기 | 예시(정수 비트) | 남은 규칙 |
+|---|---|---|---|
+| AND | `&&` | `1010 && 1100` → `1000` | 정수 bit width와 부호 |
+| OR | `||` | `1010 || 1100` → `1110` | 정수 bit width와 부호 |
+| XOR | `^` | `1010 ^ 1100` → `0110` | 음수의 bit width/표현 |
+| NOT | `~` | 폭이 고정되지 않으면 결과가 달라짐 | 정수 bit width와 signed 표현 |
+| 왼쪽 이동 | `<<` | `0011 << 1` → `0110` | overflow 및 범위 초과 이동 |
+| 오른쪽 이동 | `>>` | `0110 >> 1` → `0011` | signed 값의 산술/논리 이동 |
+
+비트 연산이 산술 연산보다 항상 빠르다고 가정하지 않는다. 실제 성능은 타입, compiler, CPU에 따라 측정한다.
+
+### 2.4 정규식 전방탐색
+
+`?=`는 정규식 positive lookahead에만 쓴다. 경계는 `regex("패턴")` 기본 제공 함수 호출로 두는 것을 제안한다. `regex("[0-9]+(?=원)")`로 `"1000원"`을 검색하면 `"1000"`을 매치하고 `원`은 결과에 넣지 않는다. `(?=원)`만 쓰면 숫자를 선택하는 게 아니라 `원` 앞의 위치만 확인하므로 숫자 패턴도 필요하다.
+
+### 2.5 다른 언어의 음수 나눗셈·논리 연산
+
+정수 `-7`과 `3`의 나눗셈은 대표적으로 두 규칙이 있다.
+
+| 규칙 | 몫 | 나머지 | 사용하는 언어 예 |
+|---|---:|---:|---|
+| 바닥 내림(floor) | `-7 // 3 = -3` | `-7 % 3 = 2` | Python. 나머지 부호가 제수와 같고 `a = (a // b) * b + (a % b)`를 만족한다. |
+| 0 방향 절삭(truncate toward zero) | `-7 / 3 = -2` | `-7 % 3 = -1` | C++, Java, Go 정수 나눗셈. 나머지 부호가 피제수와 같다. |
+
+또 다른 명확한 선택은 유클리드 나머지로, 항상 `0 <= r < |b|`를 만족시킨다. Novi에는 `//`를 몫 연산자로 이미 두었으므로, **`//`는 바닥 내림하고 `%`와 `mod(a,b)`는 제수 부호를 따르는 Python식 규칙**을 권한다. 그러면 `a = (a // b) * b + a % b`가 성립한다. 예: `-7 // 3 == -3`, `-7 % 3 == 2`. `%`와 `mod(a,b)`는 같은 연산으로 둘 수 있다.
+
+논리 연산도 언어별 규칙이 다르다.
+
+| 언어 방식 | 피연산자와 반환 | 평가 순서 |
+|---|---|---|
+| Python `and/or` | truthy/falsy 값을 받고 마지막으로 평가한 피연산자 값을 돌려줄 수 있다. | 왼쪽부터 평가하고 결과가 정해지면 오른쪽은 평가하지 않는 단락 평가 |
+| C++/Java/Go `&&/||` | 조건형 boolean을 받고 boolean 결과를 낸다. | 왼쪽부터 평가하며 결과가 정해지면 오른쪽을 건너뛴다 |
+| Novi 제안 | `and`와 `&`가 AND 별칭, `or`와 `|`가 OR 별칭; `&&`와 `||`는 정수 비트 연산 | 최적화를 위해 `and/or`와 `&/|` 모두 boolean 전용·단락 평가·boolean 반환으로 통일하는 안을 권한다. |
+
+`&`/`|`를 `and`/`or`와 같은 연산으로 정했으므로 같은 피연산자 규칙, 우선순위, 단락 평가를 적용하는 편이 일관적이다. `&&`/`||`는 고정 폭 정수 또는 임의정밀도 정수의 비트 연산이며 width/음수 표현 규칙을 추가로 정해야 한다.
+
+공식 참고: [Python 식과 연산자](https://docs.python.org/3/reference/expressions.html), [Java 연산자 명세](https://docs.oracle.com/javase/specs/jls/se26/html/jls-15.html), [Go 연산자 명세](https://go.dev/ref/spec#Operators), [C++ 곱셈 연산자 명세](https://eel.is/c++draft/expr.mul), [C++ 논리 연산자 명세](https://eel.is/c++draft/expr.log.and).
 
 ## 3. 함수와 호출
 
@@ -145,10 +329,11 @@
 | Go | `func add(a int, b int) int { return a + b }` |
 | JavaScript | `function add(a, b) { return a + b; }` |
 | TypeScript | `function add(a: number, b: number): number { return a + b; }` |
-| **Novi** | `=> ""` |
+| **Novi** | `function NAME (인자) { ... }` |
 
 - 반환 타입 생략 시 규칙: **Novi => ""**
-- 반환값 없는 함수의 표기와 결과: **Novi => ""**
+- 반환 문장 표기: `output(값)` (확정)
+- 반환값 생략 시 허용 여부와 결과: **Novi => ""**
 - 재귀 호출 및 함수 이름의 스코프: **Novi => ""**
 
 ### 3.2 함수 기능
@@ -160,7 +345,7 @@
 | 이름 있는 인수 | `f(x=1)` | 직접 지원 안 함 | 직접 지원 안 함 | 직접 지원 안 함 | 객체 인수 관용 | `=> ""` |
 | 가변 인수 | `*args`, `**kwargs` | varargs `...` | parameter pack `...` | `...T` | `...args` | `=> ""` |
 | 오버로딩 | 보통 단일 바인딩 | 시그니처 오버로딩 | 오버로딩 | 직접 지원 안 함 | 직접 지원 안 함 | `=> ""` |
-| 익명 함수 | `lambda` | 람다 `->` | 람다 `[](...) {}` | 익명 `func(...) {}` | `(x) => x` | `=> ""` |
+| 익명 함수 | `lambda` | 람다 `->` | 람다 `[](...) {}` | 익명 `func(...) {}` | `(x) => x` | `function {인자} then 명령;` |
 | 클로저 | 중첩 함수 | 람다 캡처 등 | 캡처 목록 | 함수 값/클로저 | lexical closure | `=> ""` |
 | 다중 반환값 | 튜플 관용 | 객체/레코드 | `std::tuple` 등 | `return a, b` | 배열/객체 | `=> ""` |
 | 생성기/지연 값 | `yield` | 스트림/반복자 | coroutine/범위 | `yield` (버전별) | `function*`, `yield` | `=> ""` |
@@ -178,17 +363,20 @@
 
 | 기능 | Python | Java / C++ / Go / JS / TS | **Novi** |
 |---|---|---|---|
-| 조건문 | `if cond:` / `elif` / `else` | `if (cond) { ... } else { ... }` (Python 외) | `=> ""` |
+| 조건문 | `if cond:` / `elif` / `else` | `if (cond) { ... } else { ... }` (Python 외) | `is (cond) { ... }`; `also (cond) { ... }`; `isnothing; { ... }`; `is (cond) then command;` |
 | 다중 분기 | `match` (버전별) | `switch`; Java/C++/Go/TS 지원 범위 다름 | `=> ""` |
 | 조건식 | `a if cond else b` | `cond ? a : b` (Go에는 없음) | `=> ""` |
-| while 반복 | `while cond:` | `while (cond) { ... }` | `=> ""` |
+| while 반복 | `while cond:` | `while (cond) { ... }` | 조건 블록 안 `reflex(value) target;` (제안) |
 | 기본 for | `for x in items:` | C 스타일 `for(init; cond; step)` | `=> ""` |
 | foreach | `for x in items:` | Java enhanced for / C++ range-for / Go `for range` / JS `for...of` | `=> ""` |
 | 반복 종료 | `break`, `continue` | `break`, `continue` | `=> ""` |
 | 반복 else | Python `for/while ... else` | 일반적으로 없음 | `=> ""` |
 | 패턴 분해 | tuple unpacking / `match` | 구조적 패턴 매칭은 언어·버전별 | `=> ""` |
 
-- 조건식은 반드시 Boolean이어야 하는가: **Novi => ""**
+- `istrue` 인자와 `is` 조건은 반드시 `boolean`이어야 하는가: boolean만 허용하는 안을 권한다.
+- 들여쓰기 단위(공백 수/탭 금지/탭 폭)와 혼용 오류: **Novi => ""**
+- 들여쓰기 감소로 블록이 끝나는 규칙: **Novi => ""**
+- `else`와 else-if 표기: **Novi => ""**
 - switch/match의 패턴 종류, fall-through, 기본 분기: **Novi => ""**
 - 반복 대상과 iterator 프로토콜: **Novi => ""**
 - 라벨 반복과 중첩 반복에서의 `break`/`continue`: **Novi => ""**
@@ -221,7 +409,37 @@
 | Go | `type Dog struct { ... }`; `dog := Dog{}` |
 | JavaScript | `class Dog { ... }`; `const dog = new Dog();` |
 | TypeScript | `class Dog { ... }`; `const dog = new Dog();` |
-| **Novi** | `=> ""` |
+| **Novi** | `class NAME { ... }` (기본 공개, 선언 문법 제안) |
+
+클래스 멤버는 기본적으로 공개한다. `public`은 공개 상태를 명시하고, `private` 또는 멤버 앞의 `#`는 비공개로 표시하는 문법을 제안한다. `static` 멤버는 인스턴스가 아니라 클래스에 속한다.
+
+```text
+class Counter {
+    static vari total : integer = 0;
+    vari value : integer = 0;
+    #vari secret : string = "hidden";
+    private function reset() { value = 0; }
+    public static function current() { output(total); }
+}
+```
+
+`#`를 비공개 멤버 접두어로 쓰면 C 전처리 지시문과 같은 역할을 갖지 않는다. 외부 헤더 가져오기는 `#include` 대신 Novi `import`를 쓴다. `@`는 클래스·함수·멤버 바로 앞에 붙이는 메타데이터/속성 표기로 제안한다.
+
+```text
+@inline
+function square(x) { output(x * x); }
+```
+
+`@inline` 같은 표식을 최적화 힌트로 쓸 수 있지만, compiler가 무시해도 프로그램 결과가 달라지지 않게 하는 방식을 권한다.
+
+```text
+async function loadData() {
+    vari data : = await fetchData();
+    output(data);
+}
+```
+
+`async` 함수는 비동기 결과를 반환하고, 그 함수 안의 `await`는 완료될 때까지 현재 비동기 작업만 중단하는 표기로 제안한다. 차단 방식으로 스레드를 멈추지 않으며, 구체적 task/event-loop 모델은 백엔드 설계와 함께 정한다.
 
 ### 5.2 클래스 기능별 표기
 
@@ -232,10 +450,10 @@
 | 필드 접근 | `obj.name` | `obj.name` | `obj.name` | `obj.Name` | `obj.name` | `=> ""` |
 | 상속 | `class B(A):` | `class B extends A` | `class B : public A` | 내장(embedding) | `class B extends A` | `=> ""` |
 | 인터페이스 계약 | Protocol/ABC 등 | `implements I` | 추상 클래스/개념 | interface 암시 구현 | `implements I` | `=> ""` |
-| 접근 제어 | 관례/이름 맹글링 | `public/private/protected` | 접근 지정자 | export 대문자 규칙 | `public/private/protected` | `=> ""` |
-| 정적 멤버 | `@staticmethod`/`@classmethod` | `static` | `static` | 타입 함수 관례 | `static` | `=> ""` |
+| 접근 제어 | 관례/이름 맹글링 | `public/private/protected` | 접근 지정자 | export 대문자 규칙 | `public/private/protected` | class 기본 `public`; `#` 또는 `private`는 비공개; 명시적 `public` 허용 |
+| 정적 멤버 | `@staticmethod`/`@classmethod` | `static` | `static` | 타입 함수 관례 | `static` | `static` |
 | 프로퍼티 | `@property` | getter/setter | 메서드 관례 | 메서드 관례 | getter/setter | `=> ""` |
-| 오버라이드 표시 | 관례/데코레이터 | `@Override` | `override` | 메서드 재정의 대신 embedding | 재정의/데코레이터는 실험적 | `=> ""` |
+| 오버라이드 표시 | 관례/데코레이터 | `@Override` | `override` | 메서드 재정의 대신 embedding | 재정의/데코레이터는 실험적 | `@Override` 형태 제안 |
 
 - 클래스가 타입이자 값인지, 클래스 자체의 메서드 호출 규칙: **Novi => ""**
 - 생성자 상속·부모 생성자 호출·초기화 순서: **Novi => ""**
@@ -266,12 +484,12 @@
 
 | 기능 | Python | Java | C++ | Go | JavaScript / TypeScript | **Novi** |
 |---|---|---|---|---|---|---|
-| 코드 가져오기 | `import x`, `from x import y` | `import p.Type;` / module | `#include <...>` / C++20 `import` | `import "module/path"` | `import { x } from "m"` | `=> ""` |
-| 공개 내보내기 | 기본 공개 | `public` | 선언/헤더 공개 관례 | 대문자 이름 | `export` | `=> ""` |
-| 별칭 가져오기 | `import x as y` | `import p.Type` | namespace alias | import alias | `import {x as y}` | `=> ""` |
+| 코드 가져오기 | `import x`, `from x import y` | `import p.Type;` / module | `#include <...>` / C++20 `import` | `import "module/path"` | `import { x } from "m"` | `import {novi} from {novi};` |
+| 공개 내보내기 | 기본 공개 | `public` | 선언/헤더 공개 관례 | 대문자 이름 | `export` | `export {이름};` |
+| 별칭 가져오기 | `import x as y` | `import p.Type` | namespace alias | import alias | `import {x as y}` | `like ('별명')` 또는 `= ('별명')` (범위 미정) |
 | 의존성 관리 | pip/uv/pyproject | Maven/Gradle | 패키지 관리자별 | Go modules | npm/pnpm/yarn | `=> ""` |
-| 매크로/전처리 | 없음(외부 도구) | annotation processor | `#define`, `#if`, 템플릿 | `go generate`/build tags | 빌드 도구 변환 | `=> ""` |
-| annotation/decorator | decorator | annotation | attribute | 없음/주석 도구 | decorator | `=> ""` |
+| 매크로/전처리 | 없음(외부 도구) | annotation processor | `#define`, `#if`, 템플릿 | `go generate`/build tags | 빌드 도구 변환 | `#`는 private 멤버 표기; 전처리 지시문은 미정 |
+| annotation/decorator | decorator | annotation | attribute | 없음/주석 도구 | decorator | `@metadata` 표기 제안 |
 | FFI/native 연결 | C API/확장 | JNI/Foreign Function API | C ABI/직접 연결 | cgo | Node addon/WebAssembly 등 | `=> ""` |
 
 - 순환 import, 모듈 초기화 1회 여부, 검색 경로: **Novi => ""**
@@ -290,16 +508,41 @@
 | Go | build constraints `//go:build`, `//go:generate` | 빌드 선택/외부 생성 명령 | `=> ""` |
 | TypeScript | `/// <reference ... />`, compiler options | 타입 검사·모듈/빌드 동작에 지시 | `=> ""` |
 | JavaScript | 표준 전처리 지시문 없음 | 보통 bundler/transpiler가 처리 | `=> ""` |
+| Novi | `@tag`, `#member` | `@` 메타데이터/최적화 힌트, 클래스의 `#` 비공개 멤버 | 두 표식의 적용 대상과 검증 규칙 |
 
-- Novi에 전처리 단계가 필요한가, 문법 자체로 해결할 것인가: **Novi => ""**
+- `#`는 비공개 클래스 멤버 표기로 정했으므로 `#include`/`#define` 계열 전처리 지시문과 겸용하지 않는다.
+- Novi에 별도 전처리 단계가 필요한지, `@` 메타데이터를 어떻게 읽는지는 **Novi => ""**
 - 매크로를 제공한다면 실행 가능 범위와 보안 경계: **Novi => ""**
+
+### 6.2 C 헤더와 함수 선언 참고
+
+```c
+#include <stdio.h>
+
+int add(int left, int right);  // 함수 선언(프로토타입)
+
+int main(void) {
+    printf("%d\n", add(2, 3));
+    return 0;
+}
+
+int add(int left, int right) { // 함수 정의
+    return left + right;
+}
+```
+
+- `#include <stdio.h>`는 C 표준 입출력 헤더의 선언을 현재 소스에서 사용할 수 있게 한다. 예를 들어 `printf`, `scanf`, `FILE`, `stdin`, `stdout` 선언을 제공한다. 실제 함수 구현은 C 표준 라이브러리에서 링크된다.
+- C에서 함수 호출 전에 선언/정의가 필요한 이유는 컴파일러가 함수 이름과 인자·반환 타입을 검사하기 위해서다. `add` 정의가 호출보다 앞에 있으면 별도 프로토타입은 필요 없다. 선언과 정의를 분리하거나 다른 파일에 둘 때 프로토타입을 쓴다.
+- C는 파일 최상위의 문장을 차례로 실행하는 모델이 아니다. `main`이 진입점이고, 함수가 실행 흐름의 단위다. 모든 함수가 별도 선언문을 꼭 가져야 하는 것은 아니다.
+- 현대 C에서는 선언이 보이지 않는 함수를 호출하는 방식에 의존하면 안 된다. 컴파일러는 헤더를 읽어도 함수 구현 자체는 보통 별도 표준 라이브러리에서 링크한다.
+- Novi는 C 헤더 대신 `import {novi} from {novi}`로 표준 입출력 함수 선언을 가져오는 방식이다. 실제 표준 함수 이름/목록과 module-member 구성은 추가로 정한다.
 
 ## 7. 동시성, 비동기, 메모리
 
 | 기능 | Python | Java | C++ | Go | JavaScript / TypeScript | **Novi** |
 |---|---|---|---|---|---|---|
-| 비동기 선언 | `async def` | `CompletionStage`/가상 스레드 등 | coroutine 라이브러리/표준 기능 | goroutine 호출 | `async function` | `=> ""` |
-| 대기 | `await` | `.get()` 등 | `co_await` | 채널/동기화 | `await` | `=> ""` |
+| 비동기 선언 | `async def` | `CompletionStage`/가상 스레드 등 | coroutine 라이브러리/표준 기능 | goroutine 호출 | `async function` | `async function NAME(...) { ... }` |
+| 대기 | `await` | `.get()` 등 | `co_await` | 채널/동기화 | `await` | `await` |
 | 병렬 단위 | thread/process/asyncio task | thread/virtual thread | `std::thread`/task | goroutine | worker/thread/event loop | `=> ""` |
 | 메시지 전달 | queue/asyncio | queue/channel 라이브러리 | queue 라이브러리 | channel | Promise/message channel | `=> ""` |
 | 메모리 관리 | 참조 카운트+GC | GC | 수동/RAII/smart pointer | GC | GC | `=> ""` |
@@ -314,7 +557,7 @@
 
 | 기능 | Python | Java | C++ | Go | JavaScript / TypeScript | **Novi** |
 |---|---|---|---|---|---|---|
-| 출력 | `print(x)` | `System.out.println(x)` | `std::cout << x` / `std::print` | `fmt.Println(x)` | `console.log(x)` | `=> ""` |
+| 출력 | `print(x)` | `System.out.println(x)` | `std::cout << x` / `std::print` | `fmt.Println(x)` | `console.log(x)` | `console.print(x)` (확정) |
 | 입력 | `input()` | `Scanner`/`Console` | `std::cin` | `fmt.Scan`/`bufio` | 환경 API별 입력 | `=> ""` |
 | 길이 | `len(x)` | `x.length()`/`length` | `std::size(x)` | `len(x)` | `x.length` / `Map.size` | `=> ""` |
 | 문자열 형식화 | f-string/`format` | `Formatter` | `std::format`/stream | `fmt.Sprintf` | template literal | `=> ""` |
@@ -332,13 +575,15 @@
 
 | 역할 | Python | Java | C++ | Go | JavaScript | TypeScript | **Novi** |
 |---|---|---|---|---|---|---|---|
-| 변수/상수 | 대입 / 대문자 관례 | 타입 / `var`, `final` | 타입 / `auto`, `const`, `constexpr` | `:=`, `var`, `const` | `let`, `const`, `var` | JS + 타입 표기 | `=> ""` |
-| 함수 | `def`, `lambda` | 반환 타입·메서드, 람다 `->` | 반환 타입·람다 | `func` | `function`, `=>` | JS + 타입 표기 | `=> ""` |
-| 타입/클래스 | `class`, `type` | `class`, `interface`, `enum`, `record` | `class`, `struct`, `enum`, `template` | `type`, `struct`, `interface` | `class` | JS + `type`, `interface`, `enum` | `=> ""` |
-| 분기/반복 | `if`, `match`, `for`, `while` | `if`, `switch`, `for`, `while` | `if`, `switch`, `for`, `while` | `if`, `switch`, `for`, `range` | `if`, `switch`, `for`, `while` | JS + 타입 narrowing | `=> ""` |
+| 변수/상수 | 대입 / 대문자 관례 | 타입 / `var`, `final` | 타입 / `auto`, `const`, `constexpr` | `:=`, `var`, `const` | `let`, `const`, `var` | JS + 타입 표기 | `vari`, `constant` |
+| 함수 | `def`, `lambda` | 반환 타입·메서드, 람다 `->` | 반환 타입·람다 | `func` | `function`, `=>` | JS + 타입 표기 | `function`, `output`, `return` |
+| 타입/클래스 | `class`, `type` | `class`, `interface`, `enum`, `record` | `class`, `struct`, `enum`, `template` | `type`, `struct`, `interface` | `class` | JS + `type`, `interface`, `enum` | `class` |
+| 분기/반복 | `if`, `match`, `for`, `while` | `if`, `switch`, `for`, `while` | `if`, `switch`, `for`, `while` | `if`, `switch`, `for`, `range` | `if`, `switch`, `for`, `while` | JS + 타입 narrowing | `is`/`if`, `also`, `isnothing`, `reflex` |
 | 오류/자원 | `raise`, `try`, `except`, `with` | `throw`, `try`, `catch`, `finally` | `throw`, `try`, `catch`, RAII | `error`, `defer`, `panic`, `recover` | `throw`, `try`, `catch`, `finally` | JS + 타입 검사 | `=> ""` |
-| 모듈 | `import`, `from`, `as` | `package`, `import`, `module` | `#include`, `import`, `module` | `package`, `import` | `import`, `export` | JS + type-only import/export | `=> ""` |
-| 매크로/메타 | decorator | annotation | `#define`, template, `constexpr` | compiler directive comments | 표준에는 없음 | triple-slash directive/type operator | `=> ""` |
+| 모듈 | `import`, `from`, `as` | `package`, `import`, `module` | `#include`, `import`, `module` | `package`, `import` | `import`, `export` | JS + type-only import/export | `import`, `export`, `like` |
+| 매크로/메타 | decorator | annotation | `#define`, template, `constexpr` | compiler directive comments | 표준에는 없음 | triple-slash directive/type operator | `@` metadata, `#` private 멤버 |
+| 비동기 | `async`, `await` | 비동기 API | coroutine | goroutine | `async`, `await` | JS 기반 | `async`, `await` |
+| 클래스 접근 | 관례/이름 맹글링 | `public/private/protected` | 접근 지정자 | 대문자 공개 규칙 | `public/private/protected` | JS 기반 | 기본 `public`, `#`/`private` |
 
 ## 10. 표준 라이브러리와 생태계 조사표
 
@@ -596,14 +841,50 @@
 | async·동시성 |  | `=> ""` |  |  |
 | 매크로·annotation·codegen |  | `=> ""` |  |  |
 
+## 13. 성능 목표 결정
+
+Novi의 최우선 목표는 **최적화**다. 여기서는 “빠르게”라는 표현을 측정 가능한 실행·컴파일·메모리 목표로 구체화한다. 목표 수치와 대표 프로그램은 언어 기능을 함께 정할 때 합의한다.
+
+- 우선 최적화할 대상(실행 시간/컴파일 시간/메모리/시작 시간/에너지): **Novi => ""**
+- 비교 기준 언어·컴파일러·실행 모드: **Novi => ""**
+- 대표 워크로드(수치 계산/문자열/객체/컬렉션/서버 등): **Novi => ""**
+- 기준 하드웨어·운영체제·빌드 설정: **Novi => ""**
+- 성능 목표 및 허용 회귀 폭: **Novi => ""**
+- VM, AOT, JIT 중 첫 출시 기본 경로: **Novi => ""**
+- 컴파일 시간과 실행 성능이 충돌할 때 우선순위: **Novi => ""**
+- 런타임 메모리·GC pause 목표: **Novi => ""**
+- 플랫폼별 Assembly가 허용되는 조건과 지원 CPU: **Novi => ""**
+- 최적화 정확성 보장 방식(overflow, 부동소수점, undefined behavior 등): **Novi => ""**
+
+최적화 전후 결과는 같은 코드·입력·하드웨어·빌드 설정으로 비교한다. 프로파일 없이 추측으로 넣은 최적화는 성능 개선으로 기록하지 않는다.
+
 ## 다음 결정 순서
 
-1. 선언, 문장 종료, 블록, 주석
-2. 기본 값, 타입 체계, 연산자 우선순위
-3. 함수·스코프·반환·오류 처리
-4. 객체·클래스·생성자·접근 제어·상속
-5. 컬렉션·반복 프로토콜·표준 함수
-6. 모듈·패키지·라이브러리 정책
-7. 메모리·동시성·매크로·FFI
+이미 결정된 변수·문자열·import/export·연산자·조건/반복·클래스 접근 표기는 유지한다. 파서와 실행기를 설계하기 전에 남은 핵심 선택은 다음과 같다.
+
+1. **연산 규칙**: 우선순위, `/`의 결과 타입과 0 나눗셈, `is` 비교의 정확한 의미, 비트 정수 폭.
+2. **수치 정확성**: 정수 폭/오버플로, decimal 반올림, 무한소수 근사 정밀도와 경계.
+3. **블록·문장 경계**: 중괄호 기반 조건문/함수와 들여쓰기의 역할, 세미콜론/줄바꿈 규칙.
+4. **함수 형태**: 인자·반환 타입 표기, C식 prototype과 정의의 관계, lambda 반환·캡처 규칙.
+5. **모듈 의미**: export 선언의 단위, import 경로, 두 alias 형태 중 이름이 바뀌는 대상.
+6. **클래스·속성**: 생성자/상속/오버라이드, `@` 메타데이터 의미, private 멤버 상속 규칙.
+7. **비동기**: `async` 반환 타입, `await` 문맥, task/event-loop, 취소와 오류 전파.
+8. **기본 값 규칙**: `null`, `none`, `nan`, `undefined`의 구분과 컬렉션 리터럴 표기.
 
 각 결정을 내리면 Novi 예시 코드를 추가하고, 백엔드 task 문서와 AST/바이트코드 설계를 함께 갱신한다.
+
+## 참고 문법 자료에서 얻은 설계 메모
+
+다음은 사용자가 제공한 문법 자료에서 Novi 설계에 참고할 만한 차이다. 이는 Novi 문법의 자동 채택 목록이 아니다.
+
+| 주제 | 참고 자료의 포인트 | Novi 설계에 적용할 점 |
+|---|---|---|
+| Python 함수 | 일반 함수와 한 줄 lambda를 구분하고, 함수값을 변수에 담거나 다른 함수에 전달할 수 있다. 기본 인자와 가변 인자(`*args`, `**kwargs`)도 제공한다. | 우선 선언 함수와 사용자가 정한 `function {인자} then 명령;` lambda를 구현한다. 기본/가변 인자는 별도 기능으로 정한다. lambda를 값으로 쓸지와 반환 규칙을 명세한다. |
+| Python 모듈 | 모듈은 파일 단위 이름공간이며 import는 모듈 또는 그 안의 이름을 참조한다. | Novi는 사용자가 정한 명시적 `export`와 import/export의 세미콜론을 따른다. 경로와 alias 해석, 내보낸 이름의 공개 규칙을 정한다. |
+| Kotlin 함수·lambda | 함수와 lambda를 값으로 전달·반환하는 고차 함수 사용이 간결하다. 마지막 인자가 lambda인 호출은 중괄호를 괄호 밖으로 빼는 trailing lambda 표기가 있다. | Novi의 현재 lambda 표기를 유지하고, 함수 인자로 전달하는 호출 문법과 캡처 규칙은 나중에 정한다. 암시적 `it`/`this`는 초기 문법에 넣지 않는 편을 권한다. |
+| JavaScript async | `async` 함수는 Promise로 감싼 결과를 반환하고 `await`는 완료된 값을 받는다. `await`는 실행 스레드를 막지 않고 현재 비동기 작업을 양보한다. | Novi의 `async` 결과는 `Task<T>` 같은 비동기 타입으로 표현하고, `await`는 async 문맥 안에서만 허용하는 안을 권한다. 취소와 오류 전파는 명세가 더 필요하다. |
+| Java 클래스 | 클래스/파일·package/import 구조가 있고, `static`은 인스턴스가 아닌 클래스에 속한다. 접근 제어자는 정보 은닉을 위해 사용한다. | Novi는 사용자가 정한 클래스 기본 공개, `#`/`private` 비공개, `public` 명시, `static` 공유 멤버를 따른다. Java의 파일명과 public class 강제는 별도 결정 전에는 채택하지 않는다. |
+
+참고 링크: [Python 모듈](https://namu.wiki/w/Python/%EB%AC%B8%EB%B2%95/%EB%AA%A8%EB%93%88), [Python 함수](https://namu.wiki/w/Python/%EB%AC%B8%EB%B2%95/%ED%95%A8%EC%88%98), [Kotlin 문법](https://namu.wiki/w/Kotlin/%EB%AC%B8%EB%B2%95), [JavaScript 문법](https://namu.wiki/w/JavaScript/%EB%AC%B8%EB%B2%95), [Java 문법](https://namu.wiki/w/Java/%EB%AC%B8%EB%B2%95).
+
+현재 확인 과정에서 Python 함수·JavaScript·Kotlin·Java 문법은 미러/검색 색인으로 내용을 확인했다. Python 모듈 개별 문서는 미러에서 404로 열리지 않아, 해당 항목은 Python 문법 자료의 모듈 설명과 일반적인 모듈 구조를 참고한 요약으로 표시한다.
