@@ -81,7 +81,7 @@ tasks.enqueue('parse');
 vari task : string = tasks.dequeue();
 ```
 
-초기 동작은 list 삽입 순서 유지, set 중복 무시, queue FIFO 순서다. 이 컨테이너들은 `length()`를 제공한다. 빈 queue의 `dequeue()`는 런타임 오류다. list·tuple·set·queue 순회는 시작 시점의 값을 복사한다. `tuple(a, b, ...)`는 가변 인수 생성자이며, tuple은 생성 뒤 인덱스 대입이 불가능하다. tuple literal과 구조 분해 문법은 후속 결정 항목이다.
+초기 동작은 list 삽입 순서 유지, set 중복 무시, queue FIFO 순서다. 이 컨테이너들은 `length()`를 제공한다. list는 `append`, `contains`, `remove`, `clear`를 제공하며, `remove(value)`는 첫 일치 항목만 지우고 성공 여부를 boolean으로 반환한다. 빈 queue의 `dequeue()`는 런타임 오류다. list·tuple·set·queue 순회는 시작 시점의 값을 복사한다. `tuple(a, b, ...)`는 가변 인수 생성자이며, tuple은 생성 뒤 인덱스 대입이 불가능하다. tuple literal과 구조 분해 문법은 후속 결정 항목이다.
 
 `range(start, step, stop)`은 시작값부터 간격만큼 증가/감소하는 지연 수열을 만든다. Python의 range처럼 `stop`은 포함하지 않으며, `step`은 0일 수 없다. 음수 간격은 역방향 수열이다. 현재 실행기 첫 지원은 정수 인수 범위로 제한한다.
 
