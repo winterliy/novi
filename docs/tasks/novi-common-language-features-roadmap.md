@@ -24,7 +24,7 @@ Novi의 실행 성능 최적화 목표를 유지한다. 기능 수를 늘리는 
 | 영역 | Novi 표기/방향 | 상태 | 우선순위 |
 |---|---|---:|---:|
 | 값, 변수, 상수, 산술·논리·비트 연산 | `vari`, `let`, `constant`, 합의된 연산자 | 구현 일부 | P0 |
-| 조건과 반복 | `is/also/isnothing`, 별칭 `if/elif/else`, `during`, `reflex`, `foreach` | 구현 일부 | P0 |
+| 조건과 반복 | `is/also/isnothing`, 별칭 `if/elif/else`, `during`, `reflex`, `foreach`, `break`, `continue` | 구현 일부; 반복 제어 연결 | P0 |
 | 함수·lambda·재귀·클로저 | `function NAME (...) {}`, `function {...} then ...`, `output(...)` | 구현 일부 | P0 |
 | 배열·문자열·map/set/queue | 합의된 타입 이름과 `foreach`, 인덱스 0 기반 | dictionary와 list/set/queue 기본 API; tuple·문자열 인덱싱 미구현 | P0 |
 | 오류 처리 | `try/catch/finally`, `throw ErrorKind;` | throw와 try/catch 구현; finally 미구현 | P0 |
@@ -51,7 +51,7 @@ P0는 언어로 작은 프로그램을 작성하고 안전하게 실행하는 �
 1. lexer/parser/AST/VM 간 지원 목록을 기능별로 일치시킨다.
 2. 변수 scope, 초기화 전 읽기, 상수 binding, 타입 재대입 규칙을 의미 분석에서 검사한다.
 3. 함수 인자/반환, 재귀, lambda capture와 호출 오류를 일관되게 만든다.
-4. `break`/`continue`의 표기를 Novi 방식으로 먼저 제안하고 결정 후 반복문 제어를 지원한다.
+4. `break;`/`continue;`를 지원하고, 반복문 밖 사용은 파싱 오류로 거부한다.
 5. list, tuple, dictionary, set, queue와 공통 iterable 프로토콜을 도입한다. `foreach (key, value in map)`을 포함한다.
 6. 예외 처리를 AST→bytecode→VM까지 구현하고 stack trace와 `finally` 실행을 보장한다.
 7. 문자열 escape, Unicode 정책, 보간 표기를 제안하고 문자열 라이브러리 최소 기능을 정한다.

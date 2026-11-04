@@ -237,13 +237,18 @@ ExprPtr Parser::primary() {
             throw ParseFailure{};
         }
         std::vector<StmtPtr> body;
-        if (check(TokenKind::LeftBrace)) {
-            consume(TokenKind::LeftBrace, "Expected lambda body");
-            body = block_contents();
-        } else {
-            StmtPtr command = statement();
-            body.push_back(std::move(command));
-        }
+        const int enclosing_loop_depth = loop_depth_;
+        loop_depth_ = 0;
+        try {
+            if (check(TokenKind::LeftBrace)) {
+                consume(TokenKind::LeftBrace, "Expected lambda body");
+                body = block_contents();
+            } else {
+                StmtPtr command = statement();
+                body.push_back(std::move(command));
+            }
+        } catch (...) { loop_depth_ = enclosing_loop_depth; throw; }
+        loop_depth_ = enclosing_loop_depth;
         return std::make_unique<Expr>(SourceSpan{start.span.start, previous().span.end},
             LambdaExpr{std::move(parameters), std::move(body)});
     }
@@ -316,7 +321,12 @@ StmtPtr Parser::function_declaration(bool is_async, bool is_static, bool is_priv
     const Token& name = consume_name("Expected function name");
     auto parameters = parameter_list();
     consume(TokenKind::LeftBrace, "Expected '{' before function body");
-    auto body = block_contents();
+    const int enclosing_loop_depth = loop_depth_;
+    loop_depth_ = 0;
+    std::vector<StmtPtr> body;
+    try { body = block_contents(); }
+    catch (...) { loop_depth_ = enclosing_loop_depth; throw; }
+    loop_depth_ = enclosing_loop_depth;
     FunctionDeclStmt function{name.lexeme, std::move(parameters), std::move(body)};
     function.is_async = is_async;
     function.is_static = is_static;
@@ -381,7 +391,11 @@ StmtPtr Parser::while_statement() {
     consume(TokenKind::LeftParen, "Expected '(' after while");
     ExprPtr condition = expression();
     consume(TokenKind::RightParen, "Expected ')' after condition");
-    StmtPtr body = check(TokenKind::LeftBrace) ? block_statement() : statement();
+    ++loop_depth_;
+    StmtPtr body;
+    try { body = check(TokenKind::LeftBrace) ? block_statement() : statement(); }
+    catch (...) { --loop_depth_; throw; }
+    --loop_depth_;
     return std::make_unique<Stmt>(SourceSpan{start.span.start, body->span.end},
         WhileStmt{std::move(condition), std::move(body)});
 }
@@ -404,7 +418,11 @@ StmtPtr Parser::foreach_statement() {
     }
     ExprPtr iterable = expression();
     consume(TokenKind::RightParen, "Expected ')' after foreach iterable");
-    StmtPtr body = check(TokenKind::LeftBrace) ? block_statement() : statement();
+    ++loop_depth_;
+    StmtPtr body;
+    try { body = check(TokenKind::LeftBrace) ? block_statement() : statement(); }
+    catch (...) { --loop_depth_; throw; }
+    --loop_depth_;
     return std::make_unique<Stmt>(SourceSpan{start.span.start, body->span.end},
         ForEachStmt{std::move(names), std::move(iterable), std::move(body)});
 }
@@ -504,6 +522,24 @@ StmtPtr Parser::statement(std::vector<std::string>) {
         const std::string error_kind = consume_name("Expected an error kind after throw").lexeme;
         optional_semicolon();
         return std::make_unique<Stmt>(SourceSpan{start.span.start, previous().span.end}, ThrowStmt{error_kind});
+    }
+    if (match_name("break")) {
+        const Token start = previous();
+        if (loop_depth_ == 0) {
+            report(start, "break is only valid inside a loop");
+            throw ParseFailure{};
+        }
+        optional_semicolon();
+        return std::make_unique<Stmt>(SourceSpan{start.span.start, previous().span.end}, BreakStmt{});
+    }
+    if (match_name("continue")) {
+        const Token start = previous();
+        if (loop_depth_ == 0) {
+            report(start, "continue is only valid inside a loop");
+            throw ParseFailure{};
+        }
+        optional_semicolon();
+        return std::make_unique<Stmt>(SourceSpan{start.span.start, previous().span.end}, ContinueStmt{});
     }
     if (match_name("output") || match_name("return")) {
         const Token start = previous();

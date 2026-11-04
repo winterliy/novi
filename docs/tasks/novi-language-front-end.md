@@ -31,6 +31,7 @@ Novi 언어로 작성한 소스 파일의 확장자는 `.nvi`다. 컴파일러/�
 | 조건 반복 | 조건 블록 안 `reflex(값) 변수;` | 조건이 참인 동안 재평가하는 반복으로 제안; 종료 방향과 값 전달 규칙 |
 | 조건 반복 별칭 | `during (조건식) { ... }` | `while`과 같은 조건 반복 |
 | 순회 반복 | `foreach (item in items) { ... }` | map 쌍은 `(key, value)`로 순회; 키/값 단독은 `keys()`/`values()` |
+| 반복 제어 | `break;`, `continue;` | 중첩 시 가장 안쪽 루프에 적용; 루프 바깥은 문법 오류 |
 | 수열 생성 | `range(start, step, stop)` | 정수 인수, 0이 아닌 간격, 종착값은 미포함; 현재 `foreach`는 range를 순회 |
 | 수학 배열 | `tensor<T>`; optional shape `tensor<T, [2, 3]>` | 동질 원소, 동적 shape 기본, `vector`/`matrix`는 rank 별칭 |
 | 배열 곱 | `+`/`-` 원소별; `.*`/`./` 원소별 곱/나눗셈; `matmul(a,b)` 선형대수 곱 | broadcast는 trailing axis에서 동일하거나 한쪽 크기 1일 때 |

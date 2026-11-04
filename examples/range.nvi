@@ -7,3 +7,9 @@ foreach (number in range(1, 2, 8)) {
 foreach (number in range(5, -1, 0)) {
     console.print(number);
 }
+
+foreach (number in range(1, 1, 10)) {
+    if (number == 3) continue;
+    if (number == 7) break;
+    console.print(number);
+}

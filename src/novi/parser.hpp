@@ -69,6 +69,7 @@ private:
     std::vector<Token> tokens_;
     std::size_t current_ = 0;
     bool repl_mode_ = false;
+    int loop_depth_ = 0;
     Diagnostics diagnostics_;
 };
 

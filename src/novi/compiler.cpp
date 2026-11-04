@@ -39,6 +39,11 @@ public:
     }
 
 private:
+    struct LoopContext {
+        int continue_target = 0;
+        std::vector<int> break_jumps;
+    };
+
     void emit(OpCode op, int operand, const SourceSpan& span, int operand2 = 0, int operand3 = 0) {
         function_->chunk.code.push_back({op, operand, span, operand2, operand3});
     }
@@ -112,10 +117,14 @@ private:
                 const int exit_jump = static_cast<int>(function_->chunk.code.size());
                 emit(OpCode::JumpIfFalse, -1, node.condition->span);
                 emit(OpCode::Pop, 0, node.condition->span);
+                loops_.push_back({loop_start, {}});
                 compile_statement(*node.body);
+                LoopContext loop = std::move(loops_.back());
+                loops_.pop_back();
                 emit(OpCode::Jump, loop_start, statement.span);
                 patch_jump(exit_jump);
                 emit(OpCode::Pop, 0, node.condition->span);
+                for (const int jump : loop.break_jumps) patch_jump(jump);
             },
             [&](const ForEachStmt& node) {
                 emit(OpCode::EnterScope, 0, statement.span);
@@ -125,12 +134,18 @@ private:
                 const int next_instruction = static_cast<int>(function_->chunk.code.size());
                 emit(OpCode::IteratorNext, add_constant(node.names.front()), statement.span,
                      -1, node.names.size() > 1 ? add_constant(node.names[1]) : -1);
+                loops_.push_back({loop_start, {}});
                 compile_statement(*node.body);
+                LoopContext loop = std::move(loops_.back());
+                loops_.pop_back();
                 emit(OpCode::Jump, loop_start, statement.span);
                 function_->chunk.code[static_cast<std::size_t>(next_instruction)].operand2 =
                     static_cast<int>(function_->chunk.code.size());
+                const int cleanup_target = static_cast<int>(function_->chunk.code.size());
                 emit(OpCode::Pop, 0, statement.span);
                 emit(OpCode::ExitScope, 0, statement.span);
+                for (const int jump : loop.break_jumps)
+                    function_->chunk.code[static_cast<std::size_t>(jump)].operand = cleanup_target;
             },
             [&](const FunctionDeclStmt& node) {
                 std::shared_ptr<FunctionPrototype> nested;
@@ -142,6 +157,14 @@ private:
                 if (node.value) compile_expression(*node.value);
                 else emit(OpCode::Null, 0, statement.span);
                 emit(OpCode::Return, 0, statement.span);
+            },
+            [&](const BreakStmt&) {
+                const int jump = static_cast<int>(function_->chunk.code.size());
+                emit(OpCode::Jump, -1, statement.span);
+                loops_.back().break_jumps.push_back(jump);
+            },
+            [&](const ContinueStmt&) {
+                emit(OpCode::Jump, loops_.back().continue_target, statement.span);
             },
             [&](const ThrowStmt& node) {
                 emit(OpCode::Throw, add_constant(node.error_kind), statement.span);
@@ -314,6 +337,7 @@ private:
     }
 
     std::shared_ptr<FunctionPrototype> function_;
+    std::vector<LoopContext> loops_;
 };
 
 }  // namespace
