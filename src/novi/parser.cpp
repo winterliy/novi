@@ -480,6 +480,31 @@ StmtPtr Parser::statement(std::vector<std::string>) {
     if (match_name("while")) return while_statement();
     if (match_name("during")) return while_statement();
     if (match_name("foreach")) return foreach_statement();
+    if (match_name("try")) {
+        const Token start = previous();
+        StmtPtr body = block_statement();
+        if (!match_name("catch")) {
+            report(peek(), "A try block currently requires catch(error)");
+            throw ParseFailure{};
+        }
+        consume(TokenKind::LeftParen, "Expected '(' after catch");
+        const std::string error_name = consume_name("Expected catch variable name").lexeme;
+        consume(TokenKind::RightParen, "Expected ')' after catch variable");
+        StmtPtr catch_body = block_statement();
+        if (match_name("finally")) {
+            if (check(TokenKind::LeftBrace)) (void)block_statement();
+            report(previous(), "finally is not supported in this implementation step");
+            throw ParseFailure{};
+        }
+        return std::make_unique<Stmt>(SourceSpan{start.span.start, catch_body->span.end},
+            TryCatchStmt{std::move(body), error_name, std::move(catch_body)});
+    }
+    if (match_name("throw")) {
+        const Token start = previous();
+        const std::string error_kind = consume_name("Expected an error kind after throw").lexeme;
+        optional_semicolon();
+        return std::make_unique<Stmt>(SourceSpan{start.span.start, previous().span.end}, ThrowStmt{error_kind});
+    }
     if (match_name("output") || match_name("return")) {
         const Token start = previous();
         ExprPtr value;

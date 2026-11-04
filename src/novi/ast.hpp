@@ -65,6 +65,8 @@ struct FunctionDeclStmt {
     std::vector<std::string> attributes;
 };
 struct ReturnStmt { ExprPtr value; };
+struct ThrowStmt { std::string error_kind; };
+struct TryCatchStmt { StmtPtr body; std::string error_name; StmtPtr catch_body; };
 struct FieldDeclStmt { std::string name; ExprPtr initializer; bool is_static = false; bool is_private = false; };
 struct ClassDeclStmt {
     std::string name;
@@ -78,7 +80,7 @@ struct ExportStmt { std::vector<std::string> names; std::string alias; };
 struct Stmt {
     using Node = std::variant<ExpressionStmt, VariableDeclStmt, BlockStmt, IfStmt,
                               WhileStmt, ForEachStmt, ReflexStmt, FunctionDeclStmt, ReturnStmt, MakeConstantStmt,
-                              ClassDeclStmt, ImportStmt, ExportStmt>;
+                              ClassDeclStmt, ImportStmt, ExportStmt, ThrowStmt, TryCatchStmt>;
     SourceSpan span;
     Node node;
 

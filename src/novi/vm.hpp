@@ -25,6 +25,13 @@ private:
         SourceSpan call_span;
         std::shared_ptr<InstanceObject> return_override;
     };
+    struct ExceptionHandler {
+        std::size_t frame_index = 0;
+        std::size_t target_instruction = 0;
+        std::size_t stack_size = 0;
+        std::shared_ptr<Environment> environment;
+        std::string error_name;
+    };
 
     Value execute();
     std::shared_ptr<Environment> make_environment(std::shared_ptr<Environment> parent = nullptr);
@@ -45,6 +52,7 @@ private:
     std::unordered_set<const Environment*> retained_environment_ids_;
     std::vector<Value> stack_;
     std::vector<Frame> frames_;
+    std::vector<ExceptionHandler> exception_handlers_;
     bool finished_ = false;
     Value final_result_;
 };

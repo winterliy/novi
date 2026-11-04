@@ -143,6 +143,23 @@ private:
                 else emit(OpCode::Null, 0, statement.span);
                 emit(OpCode::Return, 0, statement.span);
             },
+            [&](const ThrowStmt& node) {
+                emit(OpCode::Throw, add_constant(node.error_kind), statement.span);
+            },
+            [&](const TryCatchStmt& node) {
+                const int handler = static_cast<int>(function_->chunk.code.size());
+                emit(OpCode::PushExceptionHandler, -1, statement.span,
+                     add_constant(node.error_name));
+                compile_statement(*node.body);
+                emit(OpCode::PopExceptionHandler, 0, statement.span);
+                const int end_jump = static_cast<int>(function_->chunk.code.size());
+                emit(OpCode::Jump, -1, statement.span);
+                function_->chunk.code[static_cast<std::size_t>(handler)].operand =
+                    static_cast<int>(function_->chunk.code.size());
+                compile_statement(*node.catch_body);
+                emit(OpCode::ExitScope, 0, statement.span);
+                patch_jump(end_jump);
+            },
             [&](const ClassDeclStmt& node) {
                 if (node.superclass) emit(OpCode::GetName, add_constant(*node.superclass), statement.span);
                 else emit(OpCode::Null, 0, statement.span);

@@ -20,6 +20,7 @@ enum class OpCode {
     BitwiseAnd, BitwiseOr, BitwiseXor, ShiftLeft, ShiftRight, LogicalAnd, LogicalOr,
     Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual,
     Jump, JumpIfFalse, EnterScope, ExitScope, IteratorInit, IteratorNext,
+    PushExceptionHandler, PopExceptionHandler, Throw,
     GetIndex, SetIndex,
     MakeClosure, DefineClass, GetProperty, SetProperty,
     Call, Return

@@ -97,6 +97,7 @@ Value VM::run(const CompiledModule& module) {
 
     stack_.clear();
     frames_.clear();
+    exception_handlers_.clear();
     finished_ = false;
     final_result_ = Value{};
     auto entry = std::make_shared<FunctionObject>();
@@ -210,6 +211,7 @@ Value VM::execute() {
             return std::get<double>(value.data);
         };
 
+        try {
         switch (instruction.op) {
             case OpCode::Constant: {
                 const Constant& constant = constant_at(frame, instruction.operand, instruction.span);
@@ -320,6 +322,21 @@ Value VM::execute() {
                 }
                 break;
             }
+            case OpCode::PushExceptionHandler: {
+                if (instruction.operand < 0 || static_cast<std::size_t>(instruction.operand) > code.size())
+                    fail("Invalid exception handler target", instruction.span);
+                exception_handlers_.push_back({frames_.size() - 1,
+                    static_cast<std::size_t>(instruction.operand), stack_.size(),
+                    frame.environment, name_at(frame, instruction.operand2, instruction.span)});
+                break;
+            }
+            case OpCode::PopExceptionHandler:
+                if (exception_handlers_.empty() || exception_handlers_.back().frame_index != frames_.size() - 1)
+                    fail("Exception handler stack is unbalanced", instruction.span);
+                exception_handlers_.pop_back();
+                break;
+            case OpCode::Throw:
+                fail(name_at(frame, instruction.operand, instruction.span), instruction.span);
             case OpCode::GetIndex: {
                 Value key = pop(instruction.span);
                 Value object = pop(instruction.span);
@@ -612,6 +629,9 @@ Value VM::execute() {
             }
             case OpCode::Return: {
                 Value result = pop(instruction.span);
+                while (!exception_handlers_.empty() &&
+                       exception_handlers_.back().frame_index == frames_.size() - 1)
+                    exception_handlers_.pop_back();
                 Frame finished = std::move(frames_.back());
                 frames_.pop_back();
                 if (finished.return_override) result = Value(finished.return_override);
@@ -622,6 +642,21 @@ Value VM::execute() {
                 } else stack_.push_back(std::move(result));
                 break;
             }
+        }
+        } catch (const RuntimeError& error) {
+            if (exception_handlers_.empty()) throw;
+            ExceptionHandler handler = std::move(exception_handlers_.back());
+            exception_handlers_.pop_back();
+            while (!exception_handlers_.empty() &&
+                   exception_handlers_.back().frame_index > handler.frame_index)
+                exception_handlers_.pop_back();
+            while (frames_.size() > handler.frame_index + 1) frames_.pop_back();
+            if (handler.frame_index >= frames_.size()) throw;
+            stack_.resize(handler.stack_size);
+            Frame& catch_frame = frames_[handler.frame_index];
+            catch_frame.environment = make_environment(std::move(handler.environment));
+            catch_frame.environment->define(handler.error_name, Value(error.what()));
+            catch_frame.instruction_pointer = handler.target_instruction;
         }
     }
     return final_result_;

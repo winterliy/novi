@@ -1,0 +1,7 @@
+import {novi} from {novi};
+
+try {
+    throw InvalidValue;
+} catch (error) {
+    console.print(error:string);
+}
