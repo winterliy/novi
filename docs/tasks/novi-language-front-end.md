@@ -61,7 +61,26 @@ console.print(amount:string);       // 출력 때만 문자열로 변환
 
 위 두 문자열 따옴표는 모두 문자열이다. 모든 선언에는 타입 표기가 필요하다. `vari`는 재할당 가능하고 `let`은 새 상수를 선언한다. `constant NAME;`은 이미 선언된 변수를 이후 변경할 수 없게 만든다. `console.print(value:type)`에서 타입을 생략하면 기존 값 표현을 출력하고, 지정하면 출력 시점에만 변환한다. `: = Type(value)`는 타입을 명시해 초기값을 변환하는 표기다.
 
-Map 동작은 다음과 같이 결정했다. 없는 키 조회는 `null`을 반환한다. `foreach (key, value in map)`은 항목 쌍을 순회하고, 변수 하나로 map을 순회하면 키를 순회한다. 값만 순회할 때는 `map.values()`를 사용한다. `map.keys()`와 `map.values()`는 목록을 반환한다. 목록의 인덱스는 0부터 시작하며, 범위를 벗어난 목록 인덱스는 런타임 오류다. 현재 구현 첫 단계는 `dictionary()` 빈 값 생성, `map[key]` 조회·대입, key/value 순회다. map literal과 일반 list/tuple/set/queue 생성 문법은 아직 정하지 않았다.
+Map 동작은 다음과 같이 결정했다. 없는 키 조회는 `null`을 반환한다. `foreach (key, value in map)`은 항목 쌍을 순회하고, 변수 하나로 map을 순회하면 키를 순회한다. 값만 순회할 때는 `map.values()`를 사용한다. `map.keys()`와 `map.values()`는 목록을 반환한다. 목록의 인덱스는 0부터 시작하며, 범위를 벗어난 목록 인덱스는 런타임 오류다. 현재 구현은 `dictionary()` 빈 값 생성, `map[key]` 조회·대입, key/value 순회를 제공한다. map literal 표기는 아직 정하지 않았다.
+
+list·set·queue의 첫 기본 API는 문법 변경 없이 생성 함수와 메서드 호출로 제공한다. 이는 확정된 표기 원칙 위에 둔 초기 API 제안이며, 표준 라이브러리 정리 시 이름과 반환 규칙을 다시 확정한다.
+
+```text
+vari names : list = list();
+names.append('Ada');
+names[0] = 'Grace';
+foreach (name in names) { ... }
+
+vari tags : set = set();
+tags.add('compiler');
+tags.contains('compiler');
+
+vari tasks : queue = queue();
+tasks.enqueue('parse');
+vari task : string = tasks.dequeue();
+```
+
+초기 동작은 list 삽입 순서 유지, set 중복 무시, queue FIFO 순서다. 세 컨테이너 모두 `length()`를 제공한다. 빈 queue의 `dequeue()`는 런타임 오류다. list·set·queue 순회는 시작 시점의 값을 복사한다. 일반 list literal, tuple 생성/불변성, set 제거 메서드 등은 후속 결정 항목이다.
 
 `range(start, step, stop)`은 시작값부터 간격만큼 증가/감소하는 지연 수열을 만든다. Python의 range처럼 `stop`은 포함하지 않으며, `step`은 0일 수 없다. 음수 간격은 역방향 수열이다. 현재 실행기 첫 지원은 정수 인수 범위로 제한한다.
 
@@ -174,6 +193,8 @@ vari double : = function {x} then output(x * 2);
 - 선언과 초기화 분리 및 초기값 생략: **Novi => ""**
 - 변수 스코프(블록/함수/모듈/전역): **Novi => ""**
 - 이름 가리기(shadowing) 허용 여부 및 처리: **Novi => ""**
+
+현재 VM은 `boolean`, `string`, `integer`, `natural`, `nonint`, `realn`, `decimal`, `scalar`, `null`/`none`, `nan`, `list`, `dictionary`, `set`, `queue`, `range`의 선언 타입을 검사하며, 같은 타입 규칙을 재대입 때도 적용한다. `complex`, `imaginary`, exact `Rational`/`Irrational`, `tuple`, `vector`, `matrix`, `tensor`, `undefined`는 값 표현과 연산 규칙이 구현되기 전까지 지원 타입으로 처리하지 않는다. 이 단계는 실행 시 검사이며, 정적 의미 분석은 후속 단계다.
 
 ### 1.2 상수 선언
 

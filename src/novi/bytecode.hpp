@@ -14,7 +14,8 @@ struct FunctionPrototype;
 
 enum class OpCode {
     Constant, Null, True, False, Pop, ToBoolean,
-    GetName, DefineName, DefineConstantName, FreezeName, SetName, Cast,
+    GetName, DefineName, DefineConstantName, DefineTypedName, DefineTypedConstantName,
+    FreezeName, SetName, Cast,
     Negate, Not, BitNot, Add, Subtract, Multiply, Divide, FloorDivide, Modulo,
     BitwiseAnd, BitwiseOr, BitwiseXor, ShiftLeft, ShiftRight, LogicalAnd, LogicalOr,
     Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual,

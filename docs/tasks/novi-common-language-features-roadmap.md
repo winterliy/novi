@@ -15,7 +15,7 @@ Novi의 실행 성능 최적화 목표를 유지한다. 기능 수를 늘리는 
 
 ## 현재 확인한 기반
 
-현재 코드에는 lexer, recursive-descent parser, AST, 바이트코드 compiler, stack VM이 있다. 소스 코드는 `.nvi`이며, `vari`/`let`/기존 변수 freeze, 함수·클래스 일부, 동기 조건/루프, `foreach`와 정수 `range`, 출력, 캐스트, REPL 및 `novi new` 프로젝트 scaffold가 있다. `range`는 지연 수열이며 종착값 제외, 0이 아닌 정수 간격을 사용한다. 이번 P0 시작 범위로 빈 `dictionary()` 생성, key 인덱스 조회·대입, 쌍/키/값 순회를 추가했다. 이는 아직 빌드나 런타임 검증을 수행한 상태를 뜻하지 않는다.
+현재 코드에는 lexer, recursive-descent parser, AST, 바이트코드 compiler, stack VM이 있다. 소스 코드는 `.nvi`이며, `vari`/`let`/기존 변수 freeze, 함수·클래스 일부, 동기 조건/루프, `foreach`와 정수 `range`, 출력, 캐스트, REPL 및 `novi new` 프로젝트 scaffold가 있다. `range`는 지연 수열이며 종착값 제외, 0이 아닌 정수 간격을 사용한다. P0 시작 구현은 dictionary·list/set/queue의 기본 API, `and`/`or` 단락 평가, 선언 타입과 재대입 타입 검사를 포함한다. 이는 아직 빌드나 런타임 검증을 수행한 상태를 뜻하지 않는다.
 
 파서/VM 지원 여부는 기능별로 다르므로 문서의 `implemented` 상태는 소스 구조에 대한 이번 작업 시점의 확인이며, 런타임 적합성 테스트 결과를 의미하지 않는다.
 
@@ -26,11 +26,11 @@ Novi의 실행 성능 최적화 목표를 유지한다. 기능 수를 늘리는 
 | 값, 변수, 상수, 산술·논리·비트 연산 | `vari`, `let`, `constant`, 합의된 연산자 | 구현 일부 | P0 |
 | 조건과 반복 | `is/also/isnothing`, 별칭 `if/elif/else`, `during`, `reflex`, `foreach` | 구현 일부 | P0 |
 | 함수·lambda·재귀·클로저 | `function NAME (...) {}`, `function {...} then ...`, `output(...)` | 구현 일부 | P0 |
-| 배열·문자열·map/set/queue | 합의된 타입 이름과 `foreach`, 인덱스 0 기반 | dictionary 최소 기능 구현; 일반 list/set/queue 미구현 | P0 |
+| 배열·문자열·map/set/queue | 합의된 타입 이름과 `foreach`, 인덱스 0 기반 | dictionary와 list/set/queue 기본 API; tuple·문자열 인덱싱 미구현 | P0 |
 | 오류 처리 | `try/catch/finally`, `throw ErrorKind;` | 문서 합의, 구현 미확인/미구현 | P0 |
 | 모듈 | `import {...} from {...};`, `export {...};`, `like (...)` | built-in import만 지원 | P1 |
 | 클래스·객체 | `class`, 공개 기본, `#`/`private`, `static`, `@` | 일부 런타임 존재, 표면 지원 불완전 | P1 |
-| 타입 시스템 | 선언 타입, 검사·변환, alias, generic, union | 초기 타입/캐스트 일부; analyzer 미구현 | P1 |
+| 타입 시스템 | 선언 타입, 검사·변환, alias, generic, union | 초기 런타임 타입 검사; 정적 analyzer·alias·generic 미구현 | P0/P1 |
 | 표준 라이브러리 | `import {novi} from {novi};` | 출력·range 등 일부 내장; 모듈 registry 정리 필요 | P1 |
 | 프로젝트 빌드·패키지 | `novi new`, 추후 `novi build/run/add` | scaffold만 구현 | P1 |
 | 반복자·generator | `range` 지연 수열을 시작점으로 단계적 확장 | range 한정 | P2 |

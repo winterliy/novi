@@ -72,8 +72,13 @@ private:
             [&](const VariableDeclStmt& node) {
                 if (node.initializer) compile_expression(*node.initializer);
                 else emit(OpCode::Null, 0, statement.span);
-                emit(node.is_constant ? OpCode::DefineConstantName : OpCode::DefineName,
-                     add_constant(node.name), statement.span);
+                if (!node.fixed_type.empty()) {
+                    emit(node.is_constant ? OpCode::DefineTypedConstantName : OpCode::DefineTypedName,
+                         add_constant(node.name), statement.span, add_constant(node.fixed_type));
+                } else {
+                    emit(node.is_constant ? OpCode::DefineConstantName : OpCode::DefineName,
+                         add_constant(node.name), statement.span);
+                }
             },
             [&](const MakeConstantStmt& node) {
                 emit(OpCode::FreezeName, add_constant(node.name), statement.span);

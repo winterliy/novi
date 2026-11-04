@@ -1,5 +1,6 @@
 #include "vm.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <ostream>
@@ -60,6 +61,15 @@ VM::VM(std::ostream& output) : output_(output) {
     });
     define_native("dictionary", 0, [](VM&, const std::vector<Value>&, const SourceSpan&) {
         return Value(std::make_shared<DictionaryObject>());
+    });
+    define_native("list", 0, [](VM&, const std::vector<Value>&, const SourceSpan&) {
+        return Value(std::make_shared<ListObject>());
+    });
+    define_native("set", 0, [](VM&, const std::vector<Value>&, const SourceSpan&) {
+        return Value(std::make_shared<SetObject>());
+    });
+    define_native("queue", 0, [](VM&, const std::vector<Value>&, const SourceSpan&) {
+        return Value(std::make_shared<QueueObject>());
     });
 }
 
@@ -217,6 +227,14 @@ Value VM::execute() {
             case OpCode::GetName: stack_.push_back(frame.environment->get(name_at(frame, instruction.operand, instruction.span), instruction.span)); break;
             case OpCode::DefineName: frame.environment->define(name_at(frame, instruction.operand, instruction.span), pop(instruction.span)); break;
             case OpCode::DefineConstantName: frame.environment->define_constant(name_at(frame, instruction.operand, instruction.span), pop(instruction.span)); break;
+            case OpCode::DefineTypedName: case OpCode::DefineTypedConstantName: {
+                Value value = pop(instruction.span);
+                const std::string name = name_at(frame, instruction.operand, instruction.span);
+                const std::string type = name_at(frame, instruction.operand2, instruction.span);
+                frame.environment->define_typed(name, std::move(value), type,
+                    instruction.op == OpCode::DefineTypedConstantName, instruction.span);
+                break;
+            }
             case OpCode::FreezeName: frame.environment->make_constant(name_at(frame, instruction.operand, instruction.span), instruction.span); break;
             case OpCode::Cast: {
                 Value value = pop(instruction.span);
@@ -239,14 +257,16 @@ Value VM::execute() {
                     iterator->snapshot = (*dictionary)->entries;
                     stack_.emplace_back(std::move(iterator));
                 } else if (const auto* list = std::get_if<std::shared_ptr<ListObject>>(&iterable.data)) {
-                    auto snapshot = std::make_shared<DictionaryObject>();
-                    for (std::size_t i = 0; i < (*list)->values.size(); ++i)
-                        snapshot->entries.emplace_back(Value(static_cast<double>(i)), (*list)->values[i]);
-                    auto iterator = std::make_shared<DictionaryIteratorObject>(snapshot,
-                        DictionaryIteratorObject::Projection::Values);
-                    iterator->snapshot = snapshot->entries;
-                    stack_.emplace_back(std::move(iterator));
-                } else fail("foreach expects a range, dictionary, or list", instruction.span);
+                    if (!*list) fail("Invalid list", instruction.span);
+                    stack_.emplace_back(std::make_shared<SequenceIteratorObject>((*list)->values));
+                } else if (const auto* set = std::get_if<std::shared_ptr<SetObject>>(&iterable.data)) {
+                    if (!*set) fail("Invalid set", instruction.span);
+                    stack_.emplace_back(std::make_shared<SequenceIteratorObject>((*set)->values));
+                } else if (const auto* queue = std::get_if<std::shared_ptr<QueueObject>>(&iterable.data)) {
+                    if (!*queue) fail("Invalid queue", instruction.span);
+                    stack_.emplace_back(std::make_shared<SequenceIteratorObject>(
+                        std::vector<Value>((*queue)->values.begin(), (*queue)->values.end())));
+                } else fail("foreach expects a range, list, set, queue, or dictionary", instruction.span);
                 break;
             }
             case OpCode::IteratorNext: {
@@ -286,6 +306,12 @@ Value VM::execute() {
                         if (instruction.operand3 >= 0)
                             bind(name_at(frame, instruction.operand3, instruction.span), entry.second);
                     }
+                } else if (const auto* iterator = std::get_if<std::shared_ptr<SequenceIteratorObject>>(&stack_.back().data)) {
+                    if (!*iterator) fail("Invalid collection iterator", instruction.span);
+                    if (instruction.operand3 >= 0)
+                        fail("This collection yields one value; use one foreach variable", instruction.span);
+                    has_next = (*iterator)->index < (*iterator)->values.size();
+                    if (has_next) bind(variable, (*iterator)->values[(*iterator)->index++]);
                 } else fail("Invalid foreach iterator", instruction.span);
                 if (!has_next) {
                     if (exit_target < 0 || static_cast<std::size_t>(exit_target) > code.size())
@@ -473,6 +499,85 @@ Value VM::execute() {
                         break;
                     }
                     fail("Undefined dictionary method '" + name + "'", instruction.span);
+                }
+                if (const auto* list = std::get_if<std::shared_ptr<ListObject>>(&object.data)) {
+                    const std::string name = name_at(frame, instruction.operand, instruction.span);
+                    if (!*list) fail("Invalid list", instruction.span);
+                    auto method = std::make_shared<NativeFunction>();
+                    method->name = "list." + name;
+                    const auto source = *list;
+                    if (name == "append") {
+                        method->arity = 1;
+                        method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {
+                            source->values.push_back(args[0]);
+                            return Value{};
+                        };
+                    } else if (name == "length") {
+                        method->arity = 0;
+                        method->callback = [source](VM&, const std::vector<Value>&, const SourceSpan&) {
+                            return Value(static_cast<double>(source->values.size()));
+                        };
+                    } else fail("Undefined list method '" + name + "'", instruction.span);
+                    stack_.emplace_back(std::move(method));
+                    break;
+                }
+                if (const auto* set = std::get_if<std::shared_ptr<SetObject>>(&object.data)) {
+                    const std::string name = name_at(frame, instruction.operand, instruction.span);
+                    if (!*set) fail("Invalid set", instruction.span);
+                    auto method = std::make_shared<NativeFunction>();
+                    method->name = "set." + name;
+                    const auto source = *set;
+                    if (name == "add") {
+                        method->arity = 1;
+                        method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {
+                            if (std::none_of(source->values.begin(), source->values.end(),
+                                [&](const Value& value) { return values_equal(value, args[0]); }))
+                                source->values.push_back(args[0]);
+                            return Value{};
+                        };
+                    } else if (name == "contains") {
+                        method->arity = 1;
+                        method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {
+                            return Value(std::any_of(source->values.begin(), source->values.end(),
+                                [&](const Value& value) { return values_equal(value, args[0]); }));
+                        };
+                    } else if (name == "length") {
+                        method->arity = 0;
+                        method->callback = [source](VM&, const std::vector<Value>&, const SourceSpan&) {
+                            return Value(static_cast<double>(source->values.size()));
+                        };
+                    } else fail("Undefined set method '" + name + "'", instruction.span);
+                    stack_.emplace_back(std::move(method));
+                    break;
+                }
+                if (const auto* queue = std::get_if<std::shared_ptr<QueueObject>>(&object.data)) {
+                    const std::string name = name_at(frame, instruction.operand, instruction.span);
+                    if (!*queue) fail("Invalid queue", instruction.span);
+                    auto method = std::make_shared<NativeFunction>();
+                    method->name = "queue." + name;
+                    const auto source = *queue;
+                    if (name == "enqueue") {
+                        method->arity = 1;
+                        method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {
+                            source->values.push_back(args[0]);
+                            return Value{};
+                        };
+                    } else if (name == "dequeue") {
+                        method->arity = 0;
+                        method->callback = [source](VM&, const std::vector<Value>&, const SourceSpan&) {
+                            if (source->values.empty()) throw std::runtime_error("Cannot dequeue from an empty queue");
+                            Value value = std::move(source->values.front());
+                            source->values.pop_front();
+                            return value;
+                        };
+                    } else if (name == "length") {
+                        method->arity = 0;
+                        method->callback = [source](VM&, const std::vector<Value>&, const SourceSpan&) {
+                            return Value(static_cast<double>(source->values.size()));
+                        };
+                    } else fail("Undefined queue method '" + name + "'", instruction.span);
+                    stack_.emplace_back(std::move(method));
+                    break;
                 }
                 const auto* instance_value = std::get_if<std::shared_ptr<InstanceObject>>(&object.data);
                 if (!instance_value) fail("Only instances have properties", instruction.span);

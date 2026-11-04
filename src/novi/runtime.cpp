@@ -1,5 +1,6 @@
 #include "value.hpp"
 
+#include <cmath>
 #include <sstream>
 
 namespace novi {
@@ -32,11 +33,23 @@ Value Environment::get(const std::string& name, const SourceSpan& span) const {
 
 void Environment::define(const std::string& name, Value value) {
     values[name] = std::move(value);
+    fixed_types.erase(name);
 }
 
 void Environment::define_constant(const std::string& name, Value value) {
     values[name] = std::move(value);
+    fixed_types.erase(name);
     constants.insert(name);
+}
+
+void Environment::define_typed(const std::string& name, Value value, std::string type_name,
+                               bool is_constant, const SourceSpan& span) {
+    if (!value_matches_type(value, type_name))
+        throw RuntimeError("Value does not match declared type '" + type_name + "'", span);
+    values[name] = std::move(value);
+    fixed_types[name] = std::move(type_name);
+    if (is_constant) constants.insert(name);
+    else constants.erase(name);
 }
 
 void Environment::make_constant(const std::string& name, const SourceSpan& span) {
@@ -56,6 +69,9 @@ void Environment::assign(const std::string& name, Value value, const SourceSpan&
     if (found != values.end()) {
         if (constants.find(name) != constants.end())
             throw RuntimeError("Cannot reassign constant '" + name + "'", span);
+        const auto type = fixed_types.find(name);
+        if (type != fixed_types.end() && !value_matches_type(value, type->second))
+            throw RuntimeError("Assigned value does not match fixed type '" + type->second + "'", span);
         found->second = std::move(value);
         return;
     }
@@ -112,11 +128,32 @@ std::string value_to_string(const Value& value) {
         output << '}';
         return output.str();
     }
+    if (const auto* set = std::get_if<std::shared_ptr<SetObject>>(&value.data)) {
+        std::ostringstream output;
+        output << "set{";
+        for (std::size_t i = 0; i < (*set)->values.size(); ++i) {
+            if (i) output << ", ";
+            output << value_to_string((*set)->values[i]);
+        }
+        output << '}';
+        return output.str();
+    }
+    if (const auto* queue = std::get_if<std::shared_ptr<QueueObject>>(&value.data)) {
+        std::ostringstream output;
+        output << "queue[";
+        for (std::size_t i = 0; i < (*queue)->values.size(); ++i) {
+            if (i) output << ", ";
+            output << value_to_string((*queue)->values[i]);
+        }
+        output << ']';
+        return output.str();
+    }
     if (const auto* iterator = std::get_if<std::shared_ptr<IteratorObject>>(&value.data)) {
         (void)iterator;
         return "<range iterator>";
     }
-    return "<dictionary iterator>";
+    if (std::holds_alternative<std::shared_ptr<DictionaryIteratorObject>>(value.data)) return "<dictionary iterator>";
+    return "<collection iterator>";
 }
 
 bool value_is_truthy(const Value& value) {
@@ -148,8 +185,41 @@ bool values_equal(const Value& left, const Value& right) {
         return *value == std::get<std::shared_ptr<ListObject>>(right.data);
     if (const auto* value = std::get_if<std::shared_ptr<DictionaryObject>>(&left.data))
         return *value == std::get<std::shared_ptr<DictionaryObject>>(right.data);
-    return std::get<std::shared_ptr<DictionaryIteratorObject>>(left.data) ==
-        std::get<std::shared_ptr<DictionaryIteratorObject>>(right.data);
+    if (const auto* value = std::get_if<std::shared_ptr<DictionaryIteratorObject>>(&left.data))
+        return *value == std::get<std::shared_ptr<DictionaryIteratorObject>>(right.data);
+    if (const auto* value = std::get_if<std::shared_ptr<SequenceIteratorObject>>(&left.data))
+        return *value == std::get<std::shared_ptr<SequenceIteratorObject>>(right.data);
+    if (const auto* value = std::get_if<std::shared_ptr<SetObject>>(&left.data))
+        return *value == std::get<std::shared_ptr<SetObject>>(right.data);
+    return std::get<std::shared_ptr<QueueObject>>(left.data) ==
+        std::get<std::shared_ptr<QueueObject>>(right.data);
+}
+
+bool value_matches_type(const Value& value, const std::string& type_name) {
+    if (type_name == "boolean") return std::holds_alternative<bool>(value.data);
+    if (type_name == "string") return std::holds_alternative<std::string>(value.data);
+    if (type_name == "null" || type_name == "none") return std::holds_alternative<std::monostate>(value.data);
+    if (type_name == "nan") {
+        const auto* number = std::get_if<double>(&value.data);
+        return number && std::isnan(*number);
+    }
+    if (type_name == "integer" || type_name == "natural" || type_name == "nonint" ||
+        type_name == "realn" || type_name == "decimal" || type_name == "scalar") {
+        const auto* number = std::get_if<double>(&value.data);
+        if (!number || !std::isfinite(*number)) return false;
+        if (type_name == "integer") return std::trunc(*number) == *number;
+        if (type_name == "natural") return *number >= 0.0 && std::trunc(*number) == *number;
+        if (type_name == "nonint") return std::trunc(*number) != *number;
+        return true;
+    }
+    if (type_name == "list") return std::holds_alternative<std::shared_ptr<ListObject>>(value.data);
+    if (type_name == "dictionary") return std::holds_alternative<std::shared_ptr<DictionaryObject>>(value.data);
+    if (type_name == "set") return std::holds_alternative<std::shared_ptr<SetObject>>(value.data);
+    if (type_name == "queue") return std::holds_alternative<std::shared_ptr<QueueObject>>(value.data);
+    if (type_name == "range") return std::holds_alternative<std::shared_ptr<RangeObject>>(value.data);
+    if (const auto* instance = std::get_if<std::shared_ptr<InstanceObject>>(&value.data))
+        return *instance && (*instance)->klass->name == type_name;
+    return false;
 }
 
 }  // namespace novi

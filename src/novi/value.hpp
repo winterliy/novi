@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -28,6 +29,9 @@ struct IteratorObject;
 struct ListObject;
 struct DictionaryObject;
 struct DictionaryIteratorObject;
+struct SequenceIteratorObject;
+struct SetObject;
+struct QueueObject;
 
 class RuntimeError : public std::runtime_error {
 public:
@@ -44,7 +48,9 @@ struct Value {
                                  std::shared_ptr<ClassObject>, std::shared_ptr<InstanceObject>,
                                  std::shared_ptr<BoundMethod>, std::shared_ptr<RangeObject>,
                                  std::shared_ptr<IteratorObject>, std::shared_ptr<ListObject>,
-                                 std::shared_ptr<DictionaryObject>, std::shared_ptr<DictionaryIteratorObject>>;
+                                 std::shared_ptr<DictionaryObject>, std::shared_ptr<DictionaryIteratorObject>,
+                                 std::shared_ptr<SequenceIteratorObject>, std::shared_ptr<SetObject>,
+                                 std::shared_ptr<QueueObject>>;
     Storage data;
 
     Value() = default;
@@ -63,9 +69,14 @@ struct Value {
     Value(std::shared_ptr<ListObject> value) : data(std::move(value)) {}
     Value(std::shared_ptr<DictionaryObject> value) : data(std::move(value)) {}
     Value(std::shared_ptr<DictionaryIteratorObject> value) : data(std::move(value)) {}
+    Value(std::shared_ptr<SequenceIteratorObject> value) : data(std::move(value)) {}
+    Value(std::shared_ptr<SetObject> value) : data(std::move(value)) {}
+    Value(std::shared_ptr<QueueObject> value) : data(std::move(value)) {}
 };
 
 struct ListObject { std::vector<Value> values; };
+struct SetObject { std::vector<Value> values; };
+struct QueueObject { std::deque<Value> values; };
 
 struct DictionaryObject {
     std::vector<std::pair<Value, Value>> entries;
@@ -98,6 +109,12 @@ struct DictionaryIteratorObject {
     std::size_t index = 0;
 };
 
+struct SequenceIteratorObject {
+    explicit SequenceIteratorObject(std::vector<Value> source) : values(std::move(source)) {}
+    std::vector<Value> values;
+    std::size_t index = 0;
+};
+
 struct NativeFunction {
     using Callback = std::function<Value(VM&, const std::vector<Value>&, const SourceSpan&)>;
     std::string name;
@@ -118,11 +135,14 @@ struct Environment {
     Value get(const std::string& name, const SourceSpan& span) const;
     void define(const std::string& name, Value value);
     void define_constant(const std::string& name, Value value);
+    void define_typed(const std::string& name, Value value, std::string type_name,
+                      bool is_constant, const SourceSpan& span);
     void make_constant(const std::string& name, const SourceSpan& span);
     void assign(const std::string& name, Value value, const SourceSpan& span);
 
     std::shared_ptr<Environment> parent;
     std::unordered_map<std::string, Value> values;
+    std::unordered_map<std::string, std::string> fixed_types;
     std::unordered_set<std::string> constants;
 };
 
@@ -149,5 +169,6 @@ struct BoundMethod {
 std::string value_to_string(const Value& value);
 bool value_is_truthy(const Value& value);
 bool values_equal(const Value& left, const Value& right);
+bool value_matches_type(const Value& value, const std::string& type_name);
 
 }  // namespace novi

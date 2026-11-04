@@ -1,0 +1,21 @@
+import {novi} from {novi};
+
+vari names : list = list();
+names.append('Ada');
+names.append('Grace');
+console.print(names[0]:string);
+
+foreach (name in names) {
+    console.print(name:string);
+}
+
+vari tags : set = set();
+tags.add('compiler');
+tags.add('compiler');
+tags.add('runtime');
+console.print(tags.length());
+
+vari tasks : queue = queue();
+tasks.enqueue('parse');
+tasks.enqueue('compile');
+console.print(tasks.dequeue():string);
