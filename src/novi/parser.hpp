@@ -45,6 +45,7 @@ private:
     ExprPtr factor();
     ExprPtr unary();
     ExprPtr call();
+    ExprPtr postfix();
     ExprPtr primary();
     StmtPtr declaration(std::vector<std::string> attributes = {});
     StmtPtr statement(std::vector<std::string> attributes = {});
@@ -54,6 +55,7 @@ private:
     StmtPtr class_declaration(std::vector<std::string> attributes = {});
     StmtPtr if_statement();
     StmtPtr while_statement();
+    StmtPtr foreach_statement();
     StmtPtr block_statement();
     StmtPtr import_statement();
     StmtPtr export_statement();
@@ -66,6 +68,7 @@ private:
     const SourceFile& source_;
     std::vector<Token> tokens_;
     std::size_t current_ = 0;
+    bool repl_mode_ = false;
     Diagnostics diagnostics_;
 };
 

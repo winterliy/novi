@@ -15,12 +15,19 @@ LexResult Lexer::scan() const {
     LexResult result;
     const std::string& text = source_.text();
     std::size_t position = 0;
+    bool line_has_token = false;
     auto emit = [&](TokenKind kind, std::size_t begin, std::size_t end, double number = 0.0) {
         result.tokens.push_back({kind, text.substr(begin, end - begin), number, source_.span(begin, end)});
+        line_has_token = true;
     };
 
     while (position < text.size()) {
         const unsigned char c = static_cast<unsigned char>(text[position]);
+        if (text[position] == '\n') {
+            ++position;
+            line_has_token = false;
+            continue;
+        }
         if (std::isspace(c)) {
             ++position;
             continue;
@@ -82,6 +89,7 @@ LexResult Lexer::scan() const {
                 continue;
             }
             result.tokens.push_back({TokenKind::String, std::move(decoded), 0.0, source_.span(begin, position)});
+            line_has_token = true;
             continue;
         }
 
@@ -97,7 +105,32 @@ LexResult Lexer::scan() const {
             case '+': emit(TokenKind::Plus, begin, position); break;
             case '-': emit(TokenKind::Minus, begin, position); break;
             case '*': emit(TokenKind::Star, begin, position); break;
-            case '/': emit(take('/') ? TokenKind::FloorSlash : TokenKind::Slash, begin, position); break;
+            case '/':
+                if (!take('/')) {
+                    emit(TokenKind::Slash, begin, position);
+                } else if (position < text.size() && text[position] == '*') {
+                    ++position;
+                    bool closed = false;
+                    while (position + 2 < text.size()) {
+                        if (text[position] == '*' && text[position + 1] == '/' && text[position + 2] == '/') {
+                            position += 3;
+                            closed = true;
+                            break;
+                        }
+                        if (text[position] == '\n') line_has_token = false;
+                        ++position;
+                    }
+                    if (!closed) {
+                        result.diagnostics.push_back({DiagnosticCategory::Lexical,
+                            "Unterminated block comment", source_.span(begin, text.size())});
+                    }
+                } else if (!line_has_token ||
+                           (!result.tokens.empty() && result.tokens.back().kind == TokenKind::Semicolon)) {
+                    while (position < text.size() && text[position] != '\n') ++position;
+                } else {
+                    emit(TokenKind::FloorSlash, begin, position);
+                }
+                break;
             case '%': emit(TokenKind::Percent, begin, position); break;
             case '&': emit(take('&') ? TokenKind::LogicalAnd : TokenKind::Ampersand, begin, position); break;
             case '|': emit(take('|') ? TokenKind::LogicalOr : TokenKind::Pipe, begin, position); break;
@@ -124,6 +157,8 @@ LexResult Lexer::scan() const {
             case ')': emit(TokenKind::RightParen, begin, position); break;
             case '{': emit(TokenKind::LeftBrace, begin, position); break;
             case '}': emit(TokenKind::RightBrace, begin, position); break;
+            case '[': emit(TokenKind::LeftBracket, begin, position); break;
+            case ']': emit(TokenKind::RightBracket, begin, position); break;
             case '@': emit(TokenKind::At, begin, position); break;
             case '#': emit(TokenKind::Hash, begin, position); break;
             default:

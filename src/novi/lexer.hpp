@@ -13,7 +13,7 @@ enum class TokenKind {
     Ampersand, Pipe, LogicalAnd, LogicalOr, Caret, Tilde, ShiftLeft, ShiftRight,
     Bang, Equal, EqualEqual, BangEqual, Less, LessEqual, Greater, GreaterEqual,
     Question, Colon, Dot, Comma, Semicolon,
-    LeftParen, RightParen, LeftBrace, RightBrace,
+    LeftParen, RightParen, LeftBrace, RightBrace, LeftBracket, RightBracket,
     At, Hash, End
 };
 

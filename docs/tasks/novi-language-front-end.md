@@ -8,6 +8,8 @@
 
 Novi 언어로 작성한 소스 파일의 확장자는 `.nvi`다. 컴파일러/런타임 구현 파일은 C++ `.cpp`/`.hpp`로 유지한다. `novi path/to/file.nvi`는 파일 전체를 한 번에 파싱한다.
 
+고차원 수치 계산, 자동미분, 기호수학, 논리·증명 계층의 분리 설계는 [수학 기능 설계 제안](novi-mathematics-design.md)을 참고한다. 그 문서의 예시 문법은 확정 전까지 제안으로 취급한다.
+
 ## 사용자가 결정한 항목
 
 아래 표기는 현재 합의된 Novi 표면 문법이다. 의미 규칙이 비어 있는 부분은 임의로 확정하지 않고 후속 결정 항목에 남긴다.
@@ -15,11 +17,11 @@ Novi 언어로 작성한 소스 파일의 확장자는 `.nvi`다. 컴파일러/�
 | 기능 | 결정된 Novi 표기 | 남은 의미 규칙 |
 |---|---|---|
 | 표준 라이브러리 import | `import {novi} from {novi};` | `novi`가 기본 제공하는 함수 목록 |
-| 사용자 모듈 import/export | `export {이름};` 및 `import {이름} from {모듈};` | export 묶음, 경로 해석, 이름 충돌 처리 |
+| 사용자 모듈 import/export | `export {이름};` 및 `import {이름} from {./path.nvi};` | export 묶음, 경로 해석, 이름 충돌 처리 |
 | Import alias | `import {} from {} like ('별명');`; `import {abc}=('별명');` | 두 alias 형태의 정확한 범위와 이름 규칙 |
 | Export 이름 alias | `export {} like ("별명");` | export 묶음과 별명의 범위 |
-| 산술 연산 | `+`, `-`, `*`, `/`, `%`, `//`, `mod(a,b)` | 우선순위, 타입 혼합; 음수 몫·나머지는 Python식 바닥 내림을 권장 |
-| 논리 연산 | `and`, `or`; `&`, `|`도 같은 논리 연산 | boolean 전용·단락 평가·boolean 반환을 권장 |
+| 산술 연산 | `+`, `-`, `*`, `/`, `%`, `//`, `mod(a,b)` | 문장 안에서 값 뒤의 `//`는 몫 연산자 |
+| 논리 연산 | `and`, `or`; `&`, `|`도 같은 논리 연산 | truthiness를 검사하고 단락 평가하며 결과는 `boolean`으로 정규화 |
 | 비트 연산 | `&&`, `||`, `^`, `~`, `<<`, `>>` | 정수 폭, 부호, shift 범위 |
 | 대입·비교 | `=` 대입, `==` 같음, `!=`, 대소 비교, `is` 비교 | `is` 비교가 값 동등성·객체 동일성 중 무엇인지 |
 | 정규식 lookahead | `?=`는 정규식 전방탐색에만 사용 | `regex("패턴")` 안에서만 토큰화하도록 제안 |
@@ -27,40 +29,77 @@ Novi 언어로 작성한 소스 파일의 확장자는 `.nvi`다. 컴파일러/�
 | 조건문 | `is (조건식) { ... }`; `also (조건식) { ... }`; `isnothing; { ... }` | 블록 종료, `else if` 연결 문법; `if/elif/else`도 별칭으로 허용 |
 | 한 줄 조건문 | `is (조건식) then 명령;`; `if`도 같은 위치에 사용 | 여러 문장을 허용할지 |
 | 조건 반복 | 조건 블록 안 `reflex(값) 변수;` | 조건이 참인 동안 재평가하는 반복으로 제안; 종료 방향과 값 전달 규칙 |
+| 조건 반복 별칭 | `during (조건식) { ... }` | `while`과 같은 조건 반복 |
+| 순회 반복 | `foreach (item in items) { ... }` | map 쌍은 `(key, value)`로 순회; 키/값 단독은 `keys()`/`values()` |
+| 수열 생성 | `range(start, step, stop)` | 정수 인수, 0이 아닌 간격, 종착값은 미포함; 현재 `foreach`는 range를 순회 |
+| 수학 배열 | `tensor<T>`; optional shape `tensor<T, [2, 3]>` | 동질 원소, 동적 shape 기본, `vector`/`matrix`는 rank 별칭 |
+| 배열 곱 | `+`/`-` 원소별; `.*`/`./` 원소별 곱/나눗셈; `matmul(a,b)` 선형대수 곱 | broadcast는 trailing axis에서 동일하거나 한쪽 크기 1일 때 |
 | Boolean 검사 | `istrue(조건식)`은 `true` 또는 `false` 반환 | 조건식 타입 |
-| 출력 | `console.print(값)` | 여러 인수, 줄바꿈 |
+| 출력 | `console.print(값)` 또는 `console.print(값:출력타입)` | 타입 지정 시 출력 직전 변환; 미지정 시 원래 값 |
 | 함수 선언 | `function NAME (인자) { ... }` | C식 사전 선언(prototype)을 별도 지원할지, 인자 타입/반환 타입 표기 |
 | Lambda | `function {인자} then 명령;` | 표현식 반환, 여러 문장 lambda, 캡처 규칙 |
 | 함수 반환 | `output(값)` 또는 `return(값)` | 둘 다 같은 반환 기능; 값 생략 허용 여부 |
-| 클래스/공유 멤버 | `class`, `static` | 생성자·상속·초기화 규칙 |
+| 클래스/공유 멤버 | `class`, `static`; Java/Kotlin과 유사한 클래스 모델 | 구체적 범위는 아래 클래스 항목에서 선택 |
 | 메타데이터 | `@` | `@` 뒤 문법과 컴파일러가 처리할 metadata 목록 |
 | 비동기 | `async`, `await` | 반환 타입, 오류 전파, 취소·스케줄러 규칙 |
 | 접근 제어 | 클래스 기본 공개, `#` 또는 `private`는 비공개, `public` 명시 가능 | `#`의 멤버 접두 문법과 상속 접근 규칙 |
+| 문장 종료/주석 | 문장 끝 `;`; `{ ... }`로 끝나는 문장은 생략 가능. 줄 시작 또는 `;` 뒤 `//`는 한 줄 주석, 여러 줄은 `//* ... *//` |
+| 키워드 표기 | 키워드 동의어 허용, 키워드 대소문자 구분 없음 | 일반 식별자와 타입 이름은 대소문자 구분 여부를 별도 결정 |
+| 예외 처리 | `try { ... } catch (error) { ... } finally { ... }`; `throw ErrorKind;` | 오류 종류 목록 및 payload 규칙 |
 
 변수와 문자열 표기는 다음과 같이 정했다.
 
 ```text
-vari amount : integer = 3          // 명시한 타입은 고정
-vari amount : = integer(3)         // 타입을 고정하지 않고 현재 값만 변환
-constant amount                    // 기존 변수를 상수로 고정
-vari first : = string('text')      // 작은따옴표 문자열
-vari second : = string("text")     // 큰따옴표 문자열
+vari amount : integer = 3;         // 변경 가능한 변수, 타입 필수
+let limit : integer = 10;          // 상수 선언, 타입 필수
+vari amount : = integer(3);        // 타입 변환 초기화 표기
+constant amount;                   // 기존 변수를 상수로 전환
+vari first : string = 'text';      // 작은따옴표 문자열
+vari second : string = "text";     // 큰따옴표 문자열
+console.print(amount:string);       // 출력 때만 문자열로 변환
 ```
 
-위 두 문자열 따옴표는 모두 문자열이다. 타입이 `:`와 `=` 사이에 적히면 변수 타입을 고정하고, `: = Type(value)` 형식이면 나중에 다른 타입 값으로 바꿀 수 있다. `constant NAME`은 이미 선언된 변수를 재할당 불가로 만든다는 해석으로 기록한다.
+위 두 문자열 따옴표는 모두 문자열이다. 모든 선언에는 타입 표기가 필요하다. `vari`는 재할당 가능하고 `let`은 새 상수를 선언한다. `constant NAME;`은 이미 선언된 변수를 이후 변경할 수 없게 만든다. `console.print(value:type)`에서 타입을 생략하면 기존 값 표현을 출력하고, 지정하면 출력 시점에만 변환한다. `: = Type(value)`는 타입을 명시해 초기값을 변환하는 표기다.
+
+Map 동작은 다음과 같이 결정했다. 없는 키 조회는 `null`을 반환한다. `foreach (key, value in map)`은 항목 쌍을 순회하고, 변수 하나로 map을 순회하면 키를 순회한다. 값만 순회할 때는 `map.values()`를 사용한다. `map.keys()`와 `map.values()`는 목록을 반환한다. 목록의 인덱스는 0부터 시작하며, 범위를 벗어난 목록 인덱스는 런타임 오류다. 현재 구현 첫 단계는 `dictionary()` 빈 값 생성, `map[key]` 조회·대입, key/value 순회다. map literal과 일반 list/tuple/set/queue 생성 문법은 아직 정하지 않았다.
+
+`range(start, step, stop)`은 시작값부터 간격만큼 증가/감소하는 지연 수열을 만든다. Python의 range처럼 `stop`은 포함하지 않으며, `step`은 0일 수 없다. 음수 간격은 역방향 수열이다. 현재 실행기 첫 지원은 정수 인수 범위로 제한한다.
+
+Novi 프로젝트는 `novi new <project-name>`으로 생성한다. 기본 구조는 `src/main.nvi`, `novi.toml`, `README.md`, `.gitignore`다. 프로젝트 이름은 영문자·숫자·`-`·`_`만 허용하며 같은 이름의 경로가 이미 있으면 생성하지 않는다.
+
+```text
+foreach (key, value in user) {
+    console.print(key);
+    console.print(value);
+}
+foreach (key in user.keys()) { ... }
+foreach (value in user.values()) { ... }
+```
+
+현재 실행기에서 딕셔너리는 기본 제공 `dictionary()`로 빈 값을 만들고 대괄호로 값을 읽고 쓴다. 다음은 문법 예시다.
+
+```text
+vari user : dictionary = dictionary();
+user['name'] = 'Novi';
+console.print(user['missing'] == null); // true
+```
+
+딕셔너리 순회는 순회 시작 시 항목 순서를 복사한 뒤 그 순서를 돈다. 순회 중 map을 수정해도 현재 순회에는 새 항목이 추가되지 않는다. 내부 저장은 삽입 순서 벡터이며 key 탐색은 선형이므로, 큰 map 성능이 필요해지면 hash/index 구조로 바꾸고 측정한다.
 
 사용자 모듈은 `export`로 내보낸 이름만 다른 파일에서 `import`할 수 있다. 기본 라이브러리는 컴파일러/런타임이 제공하므로 매번 `export` 선언을 작성하지 않는다. 기본 형태와 alias 예시는 다음과 같다.
 
 ```text
 import {novi} from {novi};                  // 기본 라이브러리
-import {abc} from {"./module.nv"};          // export된 이름 가져오기
-import {} from {"./module.nv"} like ('별명');
+import {abc} from {./module.nvi};             // export된 이름 가져오기
+import {} from {./module.nvi} like ('별명');
 import {abc}=('별명');
 export {abc};
 export {} like ("별명");
 ```
 
-import/export 문장에는 세미콜론을 붙인다. `import {abc}=('별명')`가 가져온 `abc` 자체의 별칭인지, 모듈 이름의 별칭인지는 아직 정하지 않았다. `export {} like ("별명")`의 별명이 내보낸 심볼 묶음의 이름인지 모듈 이름인지도 정해야 한다. 별명 따옴표는 작은따옴표와 큰따옴표를 문자열로 허용한다.
+import/export 문장에는 세미콜론을 붙인다. 경로는 따옴표 없이 중괄호 안에 쓴다. `import {abc}=('별명')`가 가져온 `abc` 자체의 별칭인지, 모듈 이름의 별칭인지는 아직 정하지 않았다. `export {} like ("별명")`의 별명이 내보낸 심볼 묶음의 이름인지 모듈 이름인지도 정해야 한다.
+
+일반 문장은 `;`로 끝낸다. 블록 `}`로 끝나는 제어문·함수·클래스 문장에는 세미콜론을 쓰지 않는다. 키워드는 대소문자를 구분하지 않으며 동의어 표기도 허용한다. 줄 시작의 `//` 또는 세미콜론 뒤의 `//`는 줄 끝까지 주석이다. 문장 안에서 값 뒤에 오는 `//`는 몫 연산자다. 여러 줄 주석은 `//*`로 시작해 `*//`로 닫는다.
 
 산술 연산 기호는 `+`, `-`, `*`, `/`를 그대로 쓰기로 했다. 논리 연산자는 `and`, `or`다. 조건문은 `is`가 기본 표기이며 `if/elif/else`도 `is/also/isnothing` 대신 쓸 수 있다.
 
@@ -125,11 +164,12 @@ vari double : = function {x} then output(x * 2);
 | Go | `name := value` 또는 `var name Type` |
 | JavaScript | `let name = value;` |
 | TypeScript | `let name: Type = value;` |
-| **Novi** | `vari NAME : TYPE = VALUE` 또는 `vari NAME : = TYPE(VALUE)` |
+| **Novi** | `vari NAME : TYPE = VALUE`, `let NAME : TYPE = VALUE`, 또는 `vari NAME : = TYPE(VALUE)` |
 
-- `vari NAME : TYPE = VALUE`는 선언한 TYPE으로 고정한다.
-- `vari NAME : = TYPE(VALUE)`는 고정 타입 없이 지정 타입의 값으로 초기화한다.
-- 타입을 쓰지 않은 변수는 다른 타입의 값으로 바꿀 수 있다. 예: `vari a : = string('asdf')` 다음에 `vari a : = integer(3)`.
+- `vari NAME : TYPE = VALUE`는 재할당 가능한 타입 지정 변수다.
+- `let NAME : TYPE = VALUE`는 선언 시 값을 지정하는 상수다.
+- `vari NAME : = TYPE(VALUE)`는 명시한 변환 형식으로 초기화한다.
+- 선언에는 타입 또는 명시적 변환 형식이 필요하다.
 - 기존 변수에 `vari` 없이 값을 재할당하는 축약 문법: **Novi => ""**
 - 선언과 초기화 분리 및 초기값 생략: **Novi => ""**
 - 변수 스코프(블록/함수/모듈/전역): **Novi => ""**
@@ -146,7 +186,7 @@ vari double : = function {x} then output(x * 2);
 | Go | `const limit = 10` |
 | JavaScript | `const limit = 10;` |
 | TypeScript | `const limit: number = 10;` |
-| **Novi** | `constant NAME` (이미 선언한 변수를 상수로 고정) |
+| **Novi** | `let NAME : TYPE = VALUE` (새 상수 선언); `constant NAME;` (기존 변수를 상수로 전환) |
 
 - 상수가 객체 내부 필드까지 고정하는지, 변수 binding만 고정하는지: **Novi => ""**
 - 컴파일 시 계산하는 상수 지원 여부: **Novi => ""**
@@ -264,9 +304,9 @@ vari double : = function {x} then output(x * 2);
 
 - 전체 연산자 우선순위 표: **Novi => ""**
 - 결합 방향 및 단항·대입 연산 규칙: **Novi => ""**
-- `and`/`or`와 별칭 `&`/`|`는 boolean만 받고 boolean을 반환하며 단락 평가하는 안을 권한다. truthy/falsy 입력은 허용하지 않는 쪽을 권한다.
+- `and`/`or`와 별칭 `&`/`|`는 실행 단계에서 truthy/falsy를 검사해 boolean을 반환하고 단락 평가하도록 우선 구현했다. boolean만 허용할지 여부는 아직 확정하지 않았으며, 타입 검사기가 생기면 정적으로 제한할 수 있다.
 - 객체의 `==`와 동일 객체 비교를 구분하는가: **Novi => ""**
-- truthy/falsy 허용 여부는 미정이며, 논리 연산과 조건은 boolean만 받는 안을 권한다.
+- 위 truthy/falsy 지원 여부는 현재 구현 기본값이고, 최종 언어 규칙은 미정이다.
 - 암시적 형변환, 숫자/문자열 혼합 연산 처리: **Novi => ""**
 - 연산자 오버로딩 허용 여부: **Novi => ""**
 
@@ -366,9 +406,9 @@ vari double : = function {x} then output(x * 2);
 | 조건문 | `if cond:` / `elif` / `else` | `if (cond) { ... } else { ... }` (Python 외) | `is (cond) { ... }`; `also (cond) { ... }`; `isnothing; { ... }`; `is (cond) then command;` |
 | 다중 분기 | `match` (버전별) | `switch`; Java/C++/Go/TS 지원 범위 다름 | `=> ""` |
 | 조건식 | `a if cond else b` | `cond ? a : b` (Go에는 없음) | `=> ""` |
-| while 반복 | `while cond:` | `while (cond) { ... }` | 조건 블록 안 `reflex(value) target;` (제안) |
+| 조건 반복 | `while cond:` | `while (cond) { ... }` | `during (condition) { ... }` 또는 `reflex(value) target;` |
 | 기본 for | `for x in items:` | C 스타일 `for(init; cond; step)` | `=> ""` |
-| foreach | `for x in items:` | Java enhanced for / C++ range-for / Go `for range` / JS `for...of` | `=> ""` |
+| foreach | `for x in items:` | Java enhanced for / C++ range-for / Go `for range` / JS `for...of` | `foreach (item in items) { ... }` |
 | 반복 종료 | `break`, `continue` | `break`, `continue` | `=> ""` |
 | 반복 else | Python `for/while ... else` | 일반적으로 없음 | `=> ""` |
 | 패턴 분해 | tuple unpacking / `match` | 구조적 패턴 매칭은 언어·버전별 | `=> ""` |
@@ -386,11 +426,13 @@ vari double : = function {x} then output(x * 2);
 
 | 기능 | Python | Java / C++ | Go | JavaScript / TypeScript | **Novi** |
 |---|---|---|---|---|---|
-| 예외 발생 | `raise Error(...)` | `throw new E(...)` / `throw E{...}` | 관례적으로 error 반환; `panic`도 있음 | `throw new Error(...)` | `=> ""` |
-| 예외 처리 | `try/except/finally` | `try/catch/finally` (Go 없음) | `if err != nil` | `try/catch/finally` | `=> ""` |
+| 예외 발생 | `raise Error(...)` | `throw new E(...)` / `throw E{...}` | 관례적으로 error 반환; `panic`도 있음 | `throw new Error(...)` | `throw ErrorKind;` |
+| 예외 처리 | `try/except/finally` | `try/catch/finally` (Go 없음) | `if err != nil` | `try/catch/finally` | `try/catch/finally` |
 | 오류 반환값 | 예외와 반환 모두 | 예외 중심 | `(value, error)` 관례 | 예외/Promise reject | `=> ""` |
 | 오류 전파 | 예외가 상위로 전달 | 예외가 상위로 전달 | 명시적 반환 | 예외/Promise reject | `=> ""` |
 | 자원 정리 | `with` / `finally` | try-with-resources / RAII | `defer` | `finally` / `using` (버전별) | `=> ""` |
+
+현재 Novi 예외 표기는 다음과 같이 정했다. 예외는 `try/catch/finally`로 처리하고 `throw ErrorKind;`로 발생시킨다. 오류 종류는 이름 있는 타입/키워드로 정의하며, 예를 들어 `throw UndefinedVariable;`은 정의되지 않은 변수를 참조했을 때 사용할 오류 종류다. 구체적인 전체 오류 목록과 사용자 정의 오류 문법은 후속 결정 항목이다.
 
 - 오류 타입 계층과 사용자 정의 오류: **Novi => ""**
 - 복구 가능한 오류와 프로그래밍 오류 구분: **Novi => ""**

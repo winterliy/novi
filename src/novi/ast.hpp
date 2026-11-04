@@ -19,6 +19,7 @@ using StmtPtr = std::unique_ptr<Stmt>;
 struct LiteralExpr { std::variant<std::monostate, bool, double, std::string> value; };
 struct VariableExpr { std::string name; };
 struct AssignExpr { std::string name; ExprPtr value; };
+struct AssignIndexExpr { ExprPtr object; ExprPtr index; ExprPtr value; };
 enum class UnaryOperator { Negate, Not, BitNot };
 struct UnaryExpr { UnaryOperator op; ExprPtr operand; };
 enum class BinaryOperator {
@@ -31,11 +32,14 @@ struct TernaryExpr { ExprPtr condition; ExprPtr when_true; ExprPtr when_false; }
 struct CallExpr { ExprPtr callee; std::vector<ExprPtr> arguments; };
 struct GetPropertyExpr { ExprPtr object; std::string name; };
 struct SetPropertyExpr { ExprPtr object; std::string name; ExprPtr value; };
+struct CastExpr { ExprPtr value; std::string type_name; };
 struct LambdaExpr { std::vector<std::string> parameters; std::vector<StmtPtr> body; };
+struct IndexExpr { ExprPtr object; ExprPtr index; };
 
 struct Expr {
     using Node = std::variant<LiteralExpr, VariableExpr, AssignExpr, UnaryExpr, BinaryExpr,
-                              TernaryExpr, CallExpr, GetPropertyExpr, SetPropertyExpr, LambdaExpr>;
+                              TernaryExpr, CallExpr, GetPropertyExpr, SetPropertyExpr, CastExpr, LambdaExpr,
+                              IndexExpr, AssignIndexExpr>;
     SourceSpan span;
     Node node;
 
@@ -45,9 +49,11 @@ struct Expr {
 
 struct ExpressionStmt { ExprPtr expression; };
 struct VariableDeclStmt { std::string name; ExprPtr initializer; std::string fixed_type; bool is_constant = false; };
+struct MakeConstantStmt { std::string name; };
 struct BlockStmt { std::vector<StmtPtr> statements; };
 struct IfStmt { ExprPtr condition; StmtPtr then_branch; StmtPtr else_branch; };
 struct WhileStmt { ExprPtr condition; StmtPtr body; };
+struct ForEachStmt { std::vector<std::string> names; ExprPtr iterable; StmtPtr body; };
 struct ReflexStmt { ExprPtr value; std::string target; };
 struct FunctionDeclStmt {
     std::string name;
@@ -71,7 +77,7 @@ struct ExportStmt { std::vector<std::string> names; std::string alias; };
 
 struct Stmt {
     using Node = std::variant<ExpressionStmt, VariableDeclStmt, BlockStmt, IfStmt,
-                              WhileStmt, ReflexStmt, FunctionDeclStmt, ReturnStmt,
+                              WhileStmt, ForEachStmt, ReflexStmt, FunctionDeclStmt, ReturnStmt, MakeConstantStmt,
                               ClassDeclStmt, ImportStmt, ExportStmt>;
     SourceSpan span;
     Node node;

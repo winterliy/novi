@@ -10,6 +10,7 @@ add_executable(novi
     src/novi/compiler.cpp
     src/novi/lexer.cpp
     src/novi/parser.cpp
+    src/novi/project.cpp
     src/novi/runtime.cpp
     src/novi/vm.cpp
 )

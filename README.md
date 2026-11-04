@@ -25,9 +25,12 @@ c++ -std=c++17 -Wall -Wextra -Wpedantic -Isrc \
 ```sh
 ./build/novi                 # interactive REPL
 ./build/novi examples/hello.nvi
+./build/novi new my-project
 ```
 
 Enter expressions such as `1 + 2 * 3`; type `exit` to leave the REPL. A `.nvi` file is parsed as one complete program, so declarations and brace blocks can span lines.
+
+`novi new my-project` creates a starter project with `src/main.nvi`, `novi.toml`, `README.md`, and `.gitignore`. Run the generated entry file with `novi my-project/src/main.nvi`.
 
 ## Design tasks
 

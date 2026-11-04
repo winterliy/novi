@@ -39,8 +39,8 @@ public:
     }
 
 private:
-    void emit(OpCode op, int operand, const SourceSpan& span) {
-        function_->chunk.code.push_back({op, operand, span});
+    void emit(OpCode op, int operand, const SourceSpan& span, int operand2 = 0, int operand3 = 0) {
+        function_->chunk.code.push_back({op, operand, span, operand2, operand3});
     }
 
     int add_constant(Constant value) {
@@ -72,7 +72,11 @@ private:
             [&](const VariableDeclStmt& node) {
                 if (node.initializer) compile_expression(*node.initializer);
                 else emit(OpCode::Null, 0, statement.span);
-                emit(OpCode::DefineName, add_constant(node.name), statement.span);
+                emit(node.is_constant ? OpCode::DefineConstantName : OpCode::DefineName,
+                     add_constant(node.name), statement.span);
+            },
+            [&](const MakeConstantStmt& node) {
+                emit(OpCode::FreezeName, add_constant(node.name), statement.span);
             },
             [&](const ReflexStmt& node) {
                 compile_expression(*node.value);
@@ -107,6 +111,21 @@ private:
                 emit(OpCode::Jump, loop_start, statement.span);
                 patch_jump(exit_jump);
                 emit(OpCode::Pop, 0, node.condition->span);
+            },
+            [&](const ForEachStmt& node) {
+                emit(OpCode::EnterScope, 0, statement.span);
+                compile_expression(*node.iterable);
+                emit(OpCode::IteratorInit, 0, node.iterable->span);
+                const int loop_start = static_cast<int>(function_->chunk.code.size());
+                const int next_instruction = static_cast<int>(function_->chunk.code.size());
+                emit(OpCode::IteratorNext, add_constant(node.names.front()), statement.span,
+                     -1, node.names.size() > 1 ? add_constant(node.names[1]) : -1);
+                compile_statement(*node.body);
+                emit(OpCode::Jump, loop_start, statement.span);
+                function_->chunk.code[static_cast<std::size_t>(next_instruction)].operand2 =
+                    static_cast<int>(function_->chunk.code.size());
+                emit(OpCode::Pop, 0, statement.span);
+                emit(OpCode::ExitScope, 0, statement.span);
             },
             [&](const FunctionDeclStmt& node) {
                 std::shared_ptr<FunctionPrototype> nested;
@@ -162,6 +181,36 @@ private:
                 emit(op, 0, expression.span);
             },
             [&](const BinaryExpr& node) {
+                if (node.op == BinaryOperator::LogicalAnd) {
+                    compile_expression(*node.left);
+                    const int false_jump = static_cast<int>(function_->chunk.code.size());
+                    emit(OpCode::JumpIfFalse, -1, node.left->span);
+                    emit(OpCode::Pop, 0, node.left->span);
+                    compile_expression(*node.right);
+                    emit(OpCode::ToBoolean, 0, node.right->span);
+                    const int end_jump = static_cast<int>(function_->chunk.code.size());
+                    emit(OpCode::Jump, -1, expression.span);
+                    patch_jump(false_jump);
+                    emit(OpCode::Pop, 0, node.left->span);
+                    emit(OpCode::False, 0, expression.span);
+                    patch_jump(end_jump);
+                    return;
+                }
+                if (node.op == BinaryOperator::LogicalOr) {
+                    compile_expression(*node.left);
+                    const int rhs_jump = static_cast<int>(function_->chunk.code.size());
+                    emit(OpCode::JumpIfFalse, -1, node.left->span);
+                    emit(OpCode::Pop, 0, node.left->span);
+                    emit(OpCode::True, 0, expression.span);
+                    const int end_jump = static_cast<int>(function_->chunk.code.size());
+                    emit(OpCode::Jump, -1, expression.span);
+                    patch_jump(rhs_jump);
+                    emit(OpCode::Pop, 0, node.left->span);
+                    compile_expression(*node.right);
+                    emit(OpCode::ToBoolean, 0, node.right->span);
+                    patch_jump(end_jump);
+                    return;
+                }
                 compile_expression(*node.left);
                 compile_expression(*node.right);
                 OpCode op = OpCode::Add;
@@ -210,6 +259,10 @@ private:
                 compile_expression(*node.object);
                 emit(OpCode::GetProperty, add_constant(node.name), expression.span);
             },
+            [&](const CastExpr& node) {
+                compile_expression(*node.value);
+                emit(OpCode::Cast, add_constant(node.type_name), expression.span);
+            },
             [&](const SetPropertyExpr& node) {
                 compile_expression(*node.object);
                 compile_expression(*node.value);
@@ -223,6 +276,17 @@ private:
                 FunctionCompiler nested_compiler(nested);
                 auto compiled = nested_compiler.compile(node.body, expression.span);
                 emit(OpCode::MakeClosure, add_function(std::move(compiled)), expression.span);
+            },
+            [&](const IndexExpr& node) {
+                compile_expression(*node.object);
+                compile_expression(*node.index);
+                emit(OpCode::GetIndex, 0, expression.span);
+            },
+            [&](const AssignIndexExpr& node) {
+                compile_expression(*node.object);
+                compile_expression(*node.index);
+                compile_expression(*node.value);
+                emit(OpCode::SetIndex, 0, expression.span);
             }
         }, expression.node);
     }

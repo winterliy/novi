@@ -1,0 +1,20 @@
+import {novi} from {novi};
+
+vari user : dictionary = dictionary();
+user['name'] = 'Novi';
+user['version'] = '0.1';
+
+foreach (key, value in user) {
+    console.print(key:string);
+    console.print(value:string);
+}
+
+foreach (key in user.keys()) {
+    console.print(key:string);
+}
+
+foreach (value in user.values()) {
+    console.print(value:string);
+}
+
+console.print(user['missing'] == null);

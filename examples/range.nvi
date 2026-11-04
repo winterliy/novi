@@ -1,0 +1,9 @@
+import {novi} from {novi};
+
+foreach (number in range(1, 2, 8)) {
+    console.print(number);
+}
+
+foreach (number in range(5, -1, 0)) {
+    console.print(number);
+}

@@ -1,6 +1,7 @@
 #include "parser.hpp"
 
 #include <algorithm>
+#include <cctype>
 
 namespace novi {
 
@@ -16,7 +17,13 @@ bool Parser::match(TokenKind kind) {
 }
 
 bool Parser::check_name(const char* name) const {
-    return check(TokenKind::Identifier) && peek().lexeme == name;
+    if (!check(TokenKind::Identifier)) return false;
+    if (peek().lexeme.size() != std::char_traits<char>::length(name)) return false;
+    for (std::size_t i = 0; i < peek().lexeme.size(); ++i) {
+        if (std::tolower(static_cast<unsigned char>(peek().lexeme[i])) !=
+            std::tolower(static_cast<unsigned char>(name[i]))) return false;
+    }
+    return true;
 }
 
 bool Parser::match_name(const char* name) {
@@ -35,7 +42,12 @@ const Token& Parser::consume_name(const char* message) {
     return consume(TokenKind::Identifier, message);
 }
 
-void Parser::optional_semicolon() { match(TokenKind::Semicolon); }
+void Parser::optional_semicolon() {
+    if (match(TokenKind::Semicolon)) return;
+    if (repl_mode_ && at_end()) return;
+    report(peek(), "Expected ';' after statement");
+    throw ParseFailure{};
+}
 
 void Parser::report(const Token& token, const std::string& message) {
     diagnostics_.push_back({DiagnosticCategory::Syntax, message, token.span});
@@ -55,6 +67,10 @@ ExprPtr Parser::assignment() {
         if (auto* variable = std::get_if<VariableExpr>(&left->node)) {
             return std::make_unique<Expr>(SourceSpan{left->span.start, value->span.end},
                 AssignExpr{variable->name, std::move(value)});
+        }
+        if (auto* index = std::get_if<IndexExpr>(&left->node)) {
+            return std::make_unique<Expr>(SourceSpan{left->span.start, value->span.end},
+                AssignIndexExpr{std::move(index->object), std::move(index->index), std::move(value)});
         }
         report(equals, "Assignment target must be a variable");
         throw ParseFailure{};
@@ -76,7 +92,7 @@ ExprPtr Parser::conditional() {
 
 ExprPtr Parser::logical_or() {
     ExprPtr value = logical_and();
-    while (match(TokenKind::Pipe)) {
+    while (match(TokenKind::Pipe) || match_name("or")) {
         ExprPtr right = logical_and();
         value = std::make_unique<Expr>(SourceSpan{value->span.start, right->span.end},
             BinaryExpr{BinaryOperator::LogicalOr, std::move(value), std::move(right)});
@@ -86,7 +102,7 @@ ExprPtr Parser::logical_or() {
 
 ExprPtr Parser::logical_and() {
     ExprPtr value = equality();
-    while (match(TokenKind::Ampersand)) {
+    while (match(TokenKind::Ampersand) || match_name("and")) {
         ExprPtr right = equality();
         value = std::make_unique<Expr>(SourceSpan{value->span.start, right->span.end},
             BinaryExpr{BinaryOperator::LogicalAnd, std::move(value), std::move(right)});
@@ -192,6 +208,15 @@ ExprPtr Parser::call() {
             const Token& name = consume_name("Expected property name after '.'");
             value = std::make_unique<Expr>(SourceSpan{value->span.start, name.span.end},
                 GetPropertyExpr{std::move(value), name.lexeme});
+        } else if (match(TokenKind::LeftBracket)) {
+            ExprPtr index = expression();
+            const Token& close = consume(TokenKind::RightBracket, "Expected ']' after index");
+            value = std::make_unique<Expr>(SourceSpan{value->span.start, close.span.end},
+                IndexExpr{std::move(value), std::move(index)});
+        } else if (match(TokenKind::Colon)) {
+            const Token& type = consume_name("Expected type name after ':'");
+            value = std::make_unique<Expr>(SourceSpan{value->span.start, type.span.end},
+                CastExpr{std::move(value), type.lexeme});
         } else break;
     }
     return value;
@@ -224,6 +249,10 @@ ExprPtr Parser::primary() {
     }
     if (match(TokenKind::Number)) return make_expr(previous(), LiteralExpr{previous().number});
     if (match(TokenKind::String)) return make_expr(previous(), LiteralExpr{previous().lexeme});
+    if (match(TokenKind::LeftBracket)) {
+        report(previous(), "Collection literal syntax has not been decided; use dictionary() for now");
+        throw ParseFailure{};
+    }
     if (match_name("true")) return make_expr(previous(), LiteralExpr{true});
     if (match_name("false")) return make_expr(previous(), LiteralExpr{false});
     if (match_name("null") || match_name("none")) return make_expr(previous(), LiteralExpr{std::monostate{}});
@@ -268,12 +297,13 @@ StmtPtr Parser::variable_declaration(bool is_constant, bool, bool) {
     const Token& name = consume_name("Expected variable name");
     std::string fixed_type;
     ExprPtr initializer;
-    if (match(TokenKind::Colon)) {
+    const bool has_type_marker = match(TokenKind::Colon);
+    if (has_type_marker) {
         if (!match(TokenKind::Equal)) fixed_type = consume_name("Expected type name or '=' after ':'").lexeme;
     }
     if (match(TokenKind::Equal)) initializer = expression();
-    if (!initializer && fixed_type.empty()) {
-        report(peek(), "A variable declaration needs a type or initial value");
+    if (!has_type_marker || (!initializer && fixed_type.empty())) {
+        report(peek(), "A variable declaration needs a type annotation and an initial value");
         throw ParseFailure{};
     }
     optional_semicolon();
@@ -309,8 +339,12 @@ StmtPtr Parser::class_declaration(std::vector<std::string>) {
         if (match_name("function")) {
             auto method = function_declaration(is_async, is_static, is_private);
             klass.methods.push_back(std::get<FunctionDeclStmt>(std::move(method->node)));
-        } else if (match_name("vari") || match_name("constant")) {
-            const bool constant = previous().lexeme == "constant";
+        } else if (match_name("vari")) {
+            auto field = variable_declaration(false, is_private, is_static);
+            const auto& decl = std::get<VariableDeclStmt>(field->node);
+            klass.fields.push_back({decl.name, nullptr, is_static, is_private});
+        } else if (match_name("let")) {
+            const bool constant = true;
             auto field = variable_declaration(constant, is_private, is_static);
             const auto& decl = std::get<VariableDeclStmt>(field->node);
             klass.fields.push_back({decl.name, nullptr, is_static, is_private});
@@ -350,6 +384,29 @@ StmtPtr Parser::while_statement() {
     StmtPtr body = check(TokenKind::LeftBrace) ? block_statement() : statement();
     return std::make_unique<Stmt>(SourceSpan{start.span.start, body->span.end},
         WhileStmt{std::move(condition), std::move(body)});
+}
+
+StmtPtr Parser::foreach_statement() {
+    const Token start = previous();
+    consume(TokenKind::LeftParen, "Expected '(' after foreach");
+    std::vector<std::string> names;
+    names.push_back(consume_name("Expected loop variable").lexeme);
+    if (match(TokenKind::Comma)) {
+        names.push_back(consume_name("Expected second loop variable").lexeme);
+        if (names[0] == names[1]) {
+            report(previous(), "foreach key and value variables must have different names");
+            throw ParseFailure{};
+        }
+    }
+    if (!match_name("in")) {
+        report(peek(), "Expected 'in' after foreach variables");
+        throw ParseFailure{};
+    }
+    ExprPtr iterable = expression();
+    consume(TokenKind::RightParen, "Expected ')' after foreach iterable");
+    StmtPtr body = check(TokenKind::LeftBrace) ? block_statement() : statement();
+    return std::make_unique<Stmt>(SourceSpan{start.span.start, body->span.end},
+        ForEachStmt{std::move(names), std::move(iterable), std::move(body)});
 }
 
 StmtPtr Parser::import_statement() {
@@ -399,7 +456,12 @@ StmtPtr Parser::declaration(std::vector<std::string> attributes) {
         }
         bool is_async = match_name("async");
         if (match_name("vari")) return variable_declaration(false);
-        if (match_name("constant")) return variable_declaration(true);
+        if (match_name("let")) return variable_declaration(true);
+        if (match_name("constant")) {
+            const Token& name = consume_name("Expected an existing variable name after 'constant'");
+            optional_semicolon();
+            return std::make_unique<Stmt>(name.span, MakeConstantStmt{name.lexeme});
+        }
         if (match_name("function")) return function_declaration(is_async, false, false, std::move(attributes));
         if (match_name("class")) return class_declaration(std::move(attributes));
         if (match_name("import")) return import_statement();
@@ -416,6 +478,8 @@ StmtPtr Parser::declaration(std::vector<std::string> attributes) {
 StmtPtr Parser::statement(std::vector<std::string>) {
     if (match_name("is") || match_name("if")) return if_statement();
     if (match_name("while")) return while_statement();
+    if (match_name("during")) return while_statement();
+    if (match_name("foreach")) return foreach_statement();
     if (match_name("output") || match_name("return")) {
         const Token start = previous();
         ExprPtr value;
@@ -462,6 +526,7 @@ ParseResult Parser::parse_program() {
 }
 
 ParseResult Parser::parse_line() {
+    repl_mode_ = true;
     ParseResult result = parse_program();
     if (result.program) result.program->echo_last_expression = true;
     return result;

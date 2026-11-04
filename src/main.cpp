@@ -7,6 +7,7 @@
 #include "novi/compiler.hpp"
 #include "novi/lexer.hpp"
 #include "novi/parser.hpp"
+#include "novi/project.hpp"
 #include "novi/source.hpp"
 #include "novi/vm.hpp"
 
@@ -79,8 +80,28 @@ int run_repl() {
 
 int main(int argc, char** argv) {
     if (argc == 1) return run_repl();
+    if (std::string(argv[1]) == "new") {
+        if (argc != 3) {
+            std::cerr << "Usage: novi new <project-name>\n";
+            return 2;
+        }
+        std::string error;
+        if (!novi::create_project(argv[2], error)) {
+            std::cerr << "Novi project creation failed: " << error << '\n';
+            return 1;
+        }
+        std::cout << "Created Novi project '" << argv[2] << "'.\n"
+                  << "Run it with: novi " << argv[2] << "/src/main.nvi\n";
+        return 0;
+    }
+    if (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h") {
+        std::cout << "Usage: novi [source.nvi]\n"
+                  << "       novi new <project-name>\n"
+                  << "       novi (interactive REPL)\n";
+        return 0;
+    }
     if (argc != 2) {
-        std::cerr << "Usage: novi [source.nvi]\n";
+        std::cerr << "Usage: novi [source.nvi]\n       novi new <project-name>\n";
         return 2;
     }
 

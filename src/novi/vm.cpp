@@ -37,6 +37,30 @@ VM::VM(std::ostream& output) : output_(output) {
         if (!number) throw std::runtime_error("integer(value) expects a number");
         return Value(std::trunc(*number));
     });
+    define_native("range", 3, [](VM&, const std::vector<Value>& arguments, const SourceSpan&) {
+        constexpr double max_exact_integer = 9007199254740991.0;
+        auto as_integer = [&](const Value& value, const char* parameter) -> std::int64_t {
+            const auto* number = std::get_if<double>(&value.data);
+            if (!number || !std::isfinite(*number) || std::trunc(*number) != *number ||
+                std::abs(*number) > max_exact_integer) {
+                throw std::runtime_error(std::string("range ") + parameter +
+                    " must be an exactly represented integer within the safe integer range");
+            }
+            return static_cast<std::int64_t>(*number);
+        };
+        const auto start = as_integer(arguments[0], "start");
+        const auto step = as_integer(arguments[1], "step");
+        const auto stop = as_integer(arguments[2], "stop");
+        if (step == 0) throw std::runtime_error("range step must not be zero");
+        auto range = std::make_shared<RangeObject>();
+        range->start = start;
+        range->step = step;
+        range->stop = stop;
+        return Value(std::move(range));
+    });
+    define_native("dictionary", 0, [](VM&, const std::vector<Value>&, const SourceSpan&) {
+        return Value(std::make_shared<DictionaryObject>());
+    });
 }
 
 std::shared_ptr<Environment> VM::make_environment(std::shared_ptr<Environment> parent) {
@@ -189,8 +213,120 @@ Value VM::execute() {
             case OpCode::True: stack_.emplace_back(true); break;
             case OpCode::False: stack_.emplace_back(false); break;
             case OpCode::Pop: pop(instruction.span); break;
+            case OpCode::ToBoolean: stack_.emplace_back(value_is_truthy(pop(instruction.span))); break;
             case OpCode::GetName: stack_.push_back(frame.environment->get(name_at(frame, instruction.operand, instruction.span), instruction.span)); break;
             case OpCode::DefineName: frame.environment->define(name_at(frame, instruction.operand, instruction.span), pop(instruction.span)); break;
+            case OpCode::DefineConstantName: frame.environment->define_constant(name_at(frame, instruction.operand, instruction.span), pop(instruction.span)); break;
+            case OpCode::FreezeName: frame.environment->make_constant(name_at(frame, instruction.operand, instruction.span), instruction.span); break;
+            case OpCode::Cast: {
+                Value value = pop(instruction.span);
+                const std::string type = name_at(frame, instruction.operand, instruction.span);
+                if (type == "string") stack_.emplace_back(value_to_string(value));
+                else if (type == "integer") {
+                    const auto* number = std::get_if<double>(&value.data);
+                    if (!number) fail("Cannot cast " + value_to_string(value) + " to integer", instruction.span);
+                    stack_.emplace_back(std::trunc(*number));
+                } else if (type == "boolean") stack_.emplace_back(value_is_truthy(value));
+                else fail("Unknown output cast type '" + type + "'", instruction.span);
+                break;
+            }
+            case OpCode::IteratorInit: {
+                Value iterable = pop(instruction.span);
+                if (const auto* range = std::get_if<std::shared_ptr<RangeObject>>(&iterable.data)) {
+                    stack_.emplace_back(std::make_shared<IteratorObject>(*range));
+                } else if (const auto* dictionary = std::get_if<std::shared_ptr<DictionaryObject>>(&iterable.data)) {
+                    auto iterator = std::make_shared<DictionaryIteratorObject>(*dictionary);
+                    iterator->snapshot = (*dictionary)->entries;
+                    stack_.emplace_back(std::move(iterator));
+                } else if (const auto* list = std::get_if<std::shared_ptr<ListObject>>(&iterable.data)) {
+                    auto snapshot = std::make_shared<DictionaryObject>();
+                    for (std::size_t i = 0; i < (*list)->values.size(); ++i)
+                        snapshot->entries.emplace_back(Value(static_cast<double>(i)), (*list)->values[i]);
+                    auto iterator = std::make_shared<DictionaryIteratorObject>(snapshot,
+                        DictionaryIteratorObject::Projection::Values);
+                    iterator->snapshot = snapshot->entries;
+                    stack_.emplace_back(std::move(iterator));
+                } else fail("foreach expects a range, dictionary, or list", instruction.span);
+                break;
+            }
+            case OpCode::IteratorNext: {
+                if (stack_.empty()) fail("Iterator stack underflow", instruction.span);
+                const std::string variable = name_at(frame, instruction.operand, instruction.span);
+                auto bind = [&](const std::string& name, const Value& value) {
+                    if (frame.environment->contains_local(name)) frame.environment->assign(name, value, instruction.span);
+                    else frame.environment->define(name, value);
+                };
+                bool has_next = false;
+                const int exit_target = instruction.operand2;
+                if (const auto* iterator = std::get_if<std::shared_ptr<IteratorObject>>(&stack_.back().data)) {
+                    if (!*iterator) fail("Invalid foreach iterator", instruction.span);
+                    if (instruction.operand3 >= 0)
+                        fail("A range yields one value; use one foreach variable", instruction.span);
+                    const auto& range = *(*iterator)->range;
+                    has_next = range.step > 0 ? (*iterator)->current < range.stop
+                                              : (*iterator)->current > range.stop;
+                    if (has_next) {
+                        bind(variable, Value(static_cast<double>((*iterator)->current)));
+                        const auto current = (*iterator)->current;
+                        if ((range.step > 0 && current > INT64_MAX - range.step) ||
+                            (range.step < 0 && current < INT64_MIN - range.step))
+                            fail("range iteration overflow", instruction.span);
+                        (*iterator)->current += range.step;
+                    }
+                } else if (const auto* iterator = std::get_if<std::shared_ptr<DictionaryIteratorObject>>(&stack_.back().data)) {
+                    if (!*iterator) fail("Invalid dictionary iterator", instruction.span);
+                    if ((*iterator)->mode == DictionaryIteratorObject::Projection::Values && instruction.operand3 >= 0)
+                        fail("A list yields one value; use one foreach variable", instruction.span);
+                    has_next = (*iterator)->index < (*iterator)->snapshot.size();
+                    if (has_next) {
+                        const auto& entry = (*iterator)->snapshot[(*iterator)->index++];
+                        const Value& first_value = (*iterator)->mode == DictionaryIteratorObject::Projection::Values
+                            ? entry.second : entry.first;
+                        bind(variable, first_value);
+                        if (instruction.operand3 >= 0)
+                            bind(name_at(frame, instruction.operand3, instruction.span), entry.second);
+                    }
+                } else fail("Invalid foreach iterator", instruction.span);
+                if (!has_next) {
+                    if (exit_target < 0 || static_cast<std::size_t>(exit_target) > code.size())
+                        fail("Invalid foreach exit target", instruction.span);
+                    frame.instruction_pointer = static_cast<std::size_t>(exit_target);
+                }
+                break;
+            }
+            case OpCode::GetIndex: {
+                Value key = pop(instruction.span);
+                Value object = pop(instruction.span);
+                if (const auto* dictionary = std::get_if<std::shared_ptr<DictionaryObject>>(&object.data)) {
+                    if (!*dictionary) fail("Invalid dictionary", instruction.span);
+                    const auto found = (*dictionary)->get(key);
+                    stack_.push_back(found ? *found : Value{});
+                } else if (const auto* list = std::get_if<std::shared_ptr<ListObject>>(&object.data)) {
+                    const auto* index = std::get_if<double>(&key.data);
+                    if (!*list || !index || !std::isfinite(*index) || std::trunc(*index) != *index || *index < 0.0 ||
+                        *index >= static_cast<double>((*list)->values.size()))
+                        fail("List index must be an in-range non-negative integer", instruction.span);
+                    stack_.push_back((*list)->values[static_cast<std::size_t>(*index)]);
+                } else fail("Indexing requires a dictionary or list", instruction.span);
+                break;
+            }
+            case OpCode::SetIndex: {
+                Value value = pop(instruction.span);
+                Value key = pop(instruction.span);
+                Value object = pop(instruction.span);
+                if (const auto* dictionary = std::get_if<std::shared_ptr<DictionaryObject>>(&object.data)) {
+                    if (!*dictionary) fail("Invalid dictionary", instruction.span);
+                    (*dictionary)->set(std::move(key), value);
+                } else if (const auto* list = std::get_if<std::shared_ptr<ListObject>>(&object.data)) {
+                    const auto* index = std::get_if<double>(&key.data);
+                    if (!*list || !index || !std::isfinite(*index) || std::trunc(*index) != *index || *index < 0.0 ||
+                        *index >= static_cast<double>((*list)->values.size()))
+                        fail("List index must be an in-range non-negative integer", instruction.span);
+                    (*list)->values[static_cast<std::size_t>(*index)] = value;
+                } else fail("Indexed assignment requires a dictionary or list", instruction.span);
+                stack_.push_back(std::move(value));
+                break;
+            }
             case OpCode::SetName: {
                 if (stack_.empty()) fail("Operand stack underflow", instruction.span);
                 const std::string name = name_at(frame, instruction.operand, instruction.span);
@@ -320,6 +456,24 @@ Value VM::execute() {
             }
             case OpCode::GetProperty: {
                 Value object = pop(instruction.span);
+                if (const auto* dictionary = std::get_if<std::shared_ptr<DictionaryObject>>(&object.data)) {
+                    const std::string name = name_at(frame, instruction.operand, instruction.span);
+                    if (name == "keys" || name == "values") {
+                        auto method = std::make_shared<NativeFunction>();
+                        method->name = "dictionary." + name;
+                        method->arity = 0;
+                        const auto source = *dictionary;
+                        method->callback = [source, name](VM&, const std::vector<Value>&, const SourceSpan&) {
+                            auto list = std::make_shared<ListObject>();
+                            for (const auto& entry : source->entries)
+                                list->values.push_back(name == "keys" ? entry.first : entry.second);
+                            return Value(std::move(list));
+                        };
+                        stack_.emplace_back(std::move(method));
+                        break;
+                    }
+                    fail("Undefined dictionary method '" + name + "'", instruction.span);
+                }
                 const auto* instance_value = std::get_if<std::shared_ptr<InstanceObject>>(&object.data);
                 if (!instance_value) fail("Only instances have properties", instruction.span);
                 const std::string name = name_at(frame, instruction.operand, instruction.span);

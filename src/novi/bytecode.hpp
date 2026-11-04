@@ -13,12 +13,13 @@ namespace novi {
 struct FunctionPrototype;
 
 enum class OpCode {
-    Constant, Null, True, False, Pop,
-    GetName, DefineName, SetName,
+    Constant, Null, True, False, Pop, ToBoolean,
+    GetName, DefineName, DefineConstantName, FreezeName, SetName, Cast,
     Negate, Not, BitNot, Add, Subtract, Multiply, Divide, FloorDivide, Modulo,
     BitwiseAnd, BitwiseOr, BitwiseXor, ShiftLeft, ShiftRight, LogicalAnd, LogicalOr,
     Equal, NotEqual, Less, LessEqual, Greater, GreaterEqual,
-    Jump, JumpIfFalse, EnterScope, ExitScope,
+    Jump, JumpIfFalse, EnterScope, ExitScope, IteratorInit, IteratorNext,
+    GetIndex, SetIndex,
     MakeClosure, DefineClass, GetProperty, SetProperty,
     Call, Return
 };
@@ -29,6 +30,8 @@ struct Instruction {
     OpCode op;
     int operand = 0;
     SourceSpan span;
+    int operand2 = 0;
+    int operand3 = 0;
 };
 
 struct ClassPrototype {

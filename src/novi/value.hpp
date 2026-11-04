@@ -1,11 +1,14 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -20,6 +23,11 @@ struct ClassObject;
 struct InstanceObject;
 struct BoundMethod;
 struct NativeFunction;
+struct RangeObject;
+struct IteratorObject;
+struct ListObject;
+struct DictionaryObject;
+struct DictionaryIteratorObject;
 
 class RuntimeError : public std::runtime_error {
 public:
@@ -34,7 +42,9 @@ struct Value {
     using Storage = std::variant<std::monostate, bool, double, std::string,
                                  std::shared_ptr<NativeFunction>, std::shared_ptr<FunctionObject>,
                                  std::shared_ptr<ClassObject>, std::shared_ptr<InstanceObject>,
-                                 std::shared_ptr<BoundMethod>>;
+                                 std::shared_ptr<BoundMethod>, std::shared_ptr<RangeObject>,
+                                 std::shared_ptr<IteratorObject>, std::shared_ptr<ListObject>,
+                                 std::shared_ptr<DictionaryObject>, std::shared_ptr<DictionaryIteratorObject>>;
     Storage data;
 
     Value() = default;
@@ -48,6 +58,44 @@ struct Value {
     Value(std::shared_ptr<ClassObject> value) : data(std::move(value)) {}
     Value(std::shared_ptr<InstanceObject> value) : data(std::move(value)) {}
     Value(std::shared_ptr<BoundMethod> value) : data(std::move(value)) {}
+    Value(std::shared_ptr<RangeObject> value) : data(std::move(value)) {}
+    Value(std::shared_ptr<IteratorObject> value) : data(std::move(value)) {}
+    Value(std::shared_ptr<ListObject> value) : data(std::move(value)) {}
+    Value(std::shared_ptr<DictionaryObject> value) : data(std::move(value)) {}
+    Value(std::shared_ptr<DictionaryIteratorObject> value) : data(std::move(value)) {}
+};
+
+struct ListObject { std::vector<Value> values; };
+
+struct DictionaryObject {
+    std::vector<std::pair<Value, Value>> entries;
+    std::optional<Value> get(const Value& key) const;
+    void set(Value key, Value value);
+};
+
+struct RangeObject {
+    std::int64_t start = 0;
+    std::int64_t step = 1;
+    std::int64_t stop = 0;
+};
+
+struct IteratorObject {
+    explicit IteratorObject(std::shared_ptr<RangeObject> source)
+        : range(std::move(source)), current(range->start) {}
+
+    std::shared_ptr<RangeObject> range;
+    std::int64_t current = 0;
+};
+
+struct DictionaryIteratorObject {
+    enum class Projection { Pair, Keys, Values };
+    explicit DictionaryIteratorObject(std::shared_ptr<DictionaryObject> source,
+                                      Projection projection = Projection::Pair)
+        : dictionary(std::move(source)), mode(projection) {}
+    std::shared_ptr<DictionaryObject> dictionary;
+    std::vector<std::pair<Value, Value>> snapshot;
+    Projection mode;
+    std::size_t index = 0;
 };
 
 struct NativeFunction {
@@ -69,10 +117,13 @@ struct Environment {
     bool contains_local(const std::string& name) const;
     Value get(const std::string& name, const SourceSpan& span) const;
     void define(const std::string& name, Value value);
+    void define_constant(const std::string& name, Value value);
+    void make_constant(const std::string& name, const SourceSpan& span);
     void assign(const std::string& name, Value value, const SourceSpan& span);
 
     std::shared_ptr<Environment> parent;
     std::unordered_map<std::string, Value> values;
+    std::unordered_set<std::string> constants;
 };
 
 struct ClassObject {
