@@ -644,6 +644,21 @@ Value VM::execute() {
                                 source->values.push_back(args[0]);
                             return Value{};
                         };
+                    } else if (name == "remove") {
+                        method->arity = 1;
+                        method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {
+                            const auto found = std::find_if(source->values.begin(), source->values.end(),
+                                [&](const Value& value) { return values_equal(value, args[0]); });
+                            if (found == source->values.end()) return Value(false);
+                            source->values.erase(found);
+                            return Value(true);
+                        };
+                    } else if (name == "clear") {
+                        method->arity = 0;
+                        method->callback = [source](VM&, const std::vector<Value>&, const SourceSpan&) {
+                            source->values.clear();
+                            return Value{};
+                        };
                     } else if (name == "contains") {
                         method->arity = 1;
                         method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {

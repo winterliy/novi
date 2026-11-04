@@ -25,6 +25,7 @@ tags.add('compiler');
 tags.add('compiler');
 tags.add('runtime');
 console.print(tags.length());
+console.print(tags.remove('compiler'):string);
 
 vari tasks : queue = queue();
 tasks.enqueue('parse');
