@@ -586,7 +586,38 @@ Value VM::execute() {
                         stack_.emplace_back(std::move(method));
                         break;
                     }
-                    fail("Undefined dictionary method '" + name + "'", instruction.span);
+                    if (!*dictionary) fail("Invalid dictionary", instruction.span);
+                    auto method = std::make_shared<NativeFunction>();
+                    method->name = "dictionary." + name;
+                    const auto source = *dictionary;
+                    if (name == "contains") {
+                        method->arity = 1;
+                        method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {
+                            return Value(source->get(args[0]).has_value());
+                        };
+                    } else if (name == "remove") {
+                        method->arity = 1;
+                        method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {
+                            const auto found = std::find_if(source->entries.begin(), source->entries.end(),
+                                [&](const auto& entry) { return values_equal(entry.first, args[0]); });
+                            if (found == source->entries.end()) return Value(false);
+                            source->entries.erase(found);
+                            return Value(true);
+                        };
+                    } else if (name == "clear") {
+                        method->arity = 0;
+                        method->callback = [source](VM&, const std::vector<Value>&, const SourceSpan&) {
+                            source->entries.clear();
+                            return Value{};
+                        };
+                    } else if (name == "length") {
+                        method->arity = 0;
+                        method->callback = [source](VM&, const std::vector<Value>&, const SourceSpan&) {
+                            return Value(static_cast<double>(source->entries.size()));
+                        };
+                    } else fail("Undefined dictionary method '" + name + "'", instruction.span);
+                    stack_.emplace_back(std::move(method));
+                    break;
                 }
                 if (const auto* list = std::get_if<std::shared_ptr<ListObject>>(&object.data)) {
                     const std::string name = name_at(frame, instruction.operand, instruction.span);

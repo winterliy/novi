@@ -20,6 +20,12 @@ foreach (name in names) {
     console.print(name:string);
 }
 
+vari metadata : dictionary = dictionary();
+metadata['version'] = '1.0';
+console.print(metadata.contains('version'):string);
+console.print(metadata.length():string);
+console.print(metadata.remove('version'):string);
+
 vari tags : set = set();
 tags.add('compiler');
 tags.add('compiler');
