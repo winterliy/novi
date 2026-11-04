@@ -3,6 +3,7 @@ import {novi} from {novi};
 vari names : list = list();
 names.append('Ada');
 names.append('Grace');
+names.extend(tuple('Linus', 'Ken'));
 names.insert(1, 'Linus');
 console.print(names[0]:string);
 console.print(names.contains('Grace'):string);

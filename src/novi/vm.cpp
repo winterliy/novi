@@ -642,6 +642,34 @@ Value VM::execute() {
                             source->values.push_back(args[0]);
                             return Value{};
                         };
+                    } else if (name == "extend") {
+                        method->arity = 1;
+                        method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {
+                            std::vector<Value> additions;
+                            if (const auto* list_values = std::get_if<std::shared_ptr<ListObject>>(&args[0].data)) {
+                                if (!*list_values) throw std::runtime_error("Cannot extend from an invalid list");
+                                additions = (*list_values)->values;
+                            } else if (const auto* tuple_values = std::get_if<std::shared_ptr<TupleObject>>(&args[0].data)) {
+                                if (!*tuple_values) throw std::runtime_error("Cannot extend from an invalid tuple");
+                                additions = (*tuple_values)->values;
+                            } else if (const auto* set_values = std::get_if<std::shared_ptr<SetObject>>(&args[0].data)) {
+                                if (!*set_values) throw std::runtime_error("Cannot extend from an invalid set");
+                                additions = (*set_values)->values;
+                            } else if (const auto* queue_values = std::get_if<std::shared_ptr<QueueObject>>(&args[0].data)) {
+                                if (!*queue_values) throw std::runtime_error("Cannot extend from an invalid queue");
+                                additions.assign((*queue_values)->values.begin(), (*queue_values)->values.end());
+                            } else if (const auto* text = std::get_if<std::string>(&args[0].data)) {
+                                for (std::size_t offset = 0; offset < text->size();) {
+                                    const std::size_t start = offset;
+                                    const auto lead = static_cast<unsigned char>((*text)[offset]);
+                                    const std::size_t width = lead < 0x80 ? 1 : lead < 0xE0 ? 2 : lead < 0xF0 ? 3 : 4;
+                                    offset = std::min(text->size(), offset + width);
+                                    additions.emplace_back(text->substr(start, offset - start));
+                                }
+                            } else throw std::runtime_error("list.extend expects a list, tuple, set, queue, or string");
+                            source->values.insert(source->values.end(), additions.begin(), additions.end());
+                            return Value{};
+                        };
                     } else if (name == "insert") {
                         method->arity = 2;
                         method->callback = [source](VM&, const std::vector<Value>& args, const SourceSpan&) {
