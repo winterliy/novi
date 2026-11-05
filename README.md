@@ -1,3 +1,5 @@
+잠정 중단
+
 # Novi
 
 Novi is an experimental C/C++ language implementation focused on optimizing the programs it compiles. C++ is used for the compiler, VM, and object runtime; C is reserved for system APIs and stable native interfaces. Assembly may be added only for measured CPU-specific bottlenecks, with a C++ fallback. Novi-language source files use the `.nvi` extension. The compiler currently connects basic expressions, declarations, functions, conditionals, loops, and class/method syntax to the bytecode VM; some type, access-control, and module semantics are still incomplete.
