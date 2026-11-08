@@ -1,4 +1,5 @@
 #include "vm.hpp"
+#include "native/ascii.h"
 
 #include <algorithm>
 #include <cmath>
@@ -31,8 +32,13 @@ std::size_t string_codepoint_count(const std::string& value) {
     std::size_t offset = 0;
     std::size_t count = 0;
     while (offset < value.size()) {
+        const auto* bytes = reinterpret_cast<const unsigned char*>(value.data() + offset);
+        const auto prefix = novi_ascii_prefix(bytes, value.size() - offset);
+        offset += prefix;
+        count += prefix;
+        if (offset == value.size()) break;
         const auto lead = static_cast<unsigned char>(value[offset]);
-        const std::size_t width = lead < 0x80 ? 1 : lead < 0xE0 ? 2 : lead < 0xF0 ? 3 : 4;
+        const std::size_t width = lead < 0xE0 ? 2 : lead < 0xF0 ? 3 : 4;
         offset = std::min(value.size(), offset + width);
         ++count;
     }

@@ -1,0 +1,3 @@
+console.print('abc'.length():string);
+console.print('a한b😀c'.length():string);
+console.print(''.length():string);

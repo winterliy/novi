@@ -15,3 +15,7 @@ After switching source-line lookup from a linear scan to binary search, the same
 ## VM loop
 
 Configure with `-DNOVI_BUILD_BENCHMARKS=ON`, then run `build/novi_vm_benchmark` repeatedly. It compiles once before timing and measures `VM::run` for a 100,000-step range and sum, checking the printed result. VM setup is outside the timer; execution includes output and its own initialization. On the same Apple Clang 17 Release setup, the first run took 0.027031 seconds. Use repeated runs on the same machine for comparisons.
+
+## ASCII prefix backend
+
+`-DNOVI_ASCII_BACKEND=cpp|rust|asm` selects the implementation of the C ABI used by string length; C++ is the default. Rust requires `rustc`; ASM currently supports macOS arm64 only. With `-DNOVI_BUILD_BENCHMARKS=ON`, run `novi_ascii_benchmark` to time 20,000 scans of 4,096 ASCII bytes, with result validation. On this Apple arm64 machine, Release builds and five runs yielded median seconds: C++ 0.026769, Rust 0.026758, ASM 0.027442. This isolated workload does not establish an overall VM speedup. CTest passed for all three backends, including ASCII boundary and mixed Unicode string cases.

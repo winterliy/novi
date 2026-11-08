@@ -75,3 +75,9 @@
 - Homebrew로 CMake 4.4.5를 설치했고 Release 빌드와 CTest 2개 suite를 실행했다. 이 환경에서는 SDK libc++ include 경로를 명시했다.
 - `benchmarks/source_lines.py`로 10,000줄 프로그램의 전체 처리 시간을 측정했다. source location 탐색을 이진 탐색으로 바꾼 뒤 중앙값 0.253253초에서 0.025641초로 줄었다. 해당 워크로드와 기기 기준이며 VM 전체의 속도 향상을 뜻하지 않는다.
 - 다음 작업: VM 실행 전용 benchmark와 C ABI 경계를 마련한 뒤 Rust/ASM 후보를 기준 구현과 비교한다. 초기화·타입 및 함수 의미 분석도 이어서 진행한다.
+
+### 후속 구현 — VM 측정과 네이티브 경계
+
+- 10만 회 range 합산 VM benchmark를 추가했다. 컴파일은 측정 전에 수행하며 결과를 검증한다.
+- 문자열 길이의 ASCII 접두 구간을 C ABI로 분리하고 C++, Rust, macOS arm64 ASM 구현을 빌드 옵션으로 제공한다. 세 구성 모두 CTest를 통과했다.
+- ASCII 전용 benchmark의 다섯 회 중앙값은 C++ 0.026769초, Rust 0.026758초, ASM 0.027442초였다. 이 기기·워크로드에서 C++를 기본값으로 유지하며, 이 수치를 VM 전체 성능으로 일반화하지 않는다.
