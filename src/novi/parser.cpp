@@ -306,9 +306,12 @@ StmtPtr Parser::variable_declaration(bool is_constant, bool, bool) {
     ExprPtr initializer;
     const bool has_type_marker = match(TokenKind::Colon);
     if (has_type_marker) {
-        if (!match(TokenKind::Equal)) fixed_type = consume_name("Expected type name or '=' after ':'").lexeme;
+        if (match(TokenKind::Equal)) initializer = expression();
+        else {
+            fixed_type = consume_name("Expected type name or '=' after ':'").lexeme;
+            if (match(TokenKind::Equal)) initializer = expression();
+        }
     }
-    if (match(TokenKind::Equal)) initializer = expression();
     if (!has_type_marker || (!initializer && fixed_type.empty())) {
         report(peek(), "A variable declaration needs a type annotation and an initial value");
         throw ParseFailure{};

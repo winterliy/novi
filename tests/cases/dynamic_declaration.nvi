@@ -1,0 +1,6 @@
+vari value : = string('hello');
+console.print(value:string);
+value = integer(3);
+console.print(value:string);
+let fixed : = integer(7);
+console.print(fixed:string);
