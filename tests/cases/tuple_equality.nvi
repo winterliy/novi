@@ -1,0 +1,5 @@
+import {novi} from {novi};
+
+let first : tuple = tuple(1, 'x');
+let second : tuple = tuple(1, 'x');
+console.print((first == second):boolean);

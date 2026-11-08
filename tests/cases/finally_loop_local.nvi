@@ -1,0 +1,14 @@
+import {novi} from {novi};
+
+vari count : integer = 0;
+try {
+    during (count < 1) {
+        during (true) {
+            break;
+        }
+        count = count + 1;
+    }
+} finally {
+    count = count + 10;
+}
+console.print(count:string);

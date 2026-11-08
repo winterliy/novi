@@ -1,0 +1,12 @@
+import {novi} from {novi};
+
+vari caught : integer = 0;
+try {
+    try {
+    } finally {
+        throw CleanupFailure;
+    }
+} catch (error) {
+    caught = caught + 1;
+}
+console.print(caught:string);

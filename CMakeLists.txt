@@ -16,3 +16,14 @@ add_executable(novi
 )
 target_include_directories(novi PRIVATE src)
 target_compile_options(novi PRIVATE -Wall -Wextra -Wpedantic)
+
+include(CTest)
+if(BUILD_TESTING)
+    add_test(
+        NAME novi_runtime_regressions
+        COMMAND ${CMAKE_COMMAND}
+            "-DNOVI_EXECUTABLE=$<TARGET_FILE:novi>"
+            "-DTEST_CASE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/cases"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/run_cases.cmake"
+    )
+endif()

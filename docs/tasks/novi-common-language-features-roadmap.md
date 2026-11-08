@@ -27,7 +27,7 @@ Novi의 실행 성능 최적화 목표를 유지한다. 기능 수를 늘리는 
 | 조건과 반복 | `is/also/isnothing`, 별칭 `if/elif/else`, `during`, `reflex`, `foreach`, `break`, `continue` | 구현 일부; 반복 제어 연결 | P0 |
 | 함수·lambda·재귀·클로저 | `function NAME (...) {}`, `function {...} then ...`, `output(...)` | 구현 일부 | P0 |
 | 배열·문자열·map/set/queue | 합의된 타입 이름과 `foreach`, 인덱스 0 기반 | dictionary, tuple, list(`extend/insert/pop(index?)` 포함)·set·queue 기본 API; 문자열 인덱싱·순회·`length()`는 UTF-8 코드포인트 기준 | P0 |
-| 오류 처리 | `try/catch/finally`, `throw ErrorKind;` | throw와 try/catch/finally의 파서·컴파일러·VM 경로 구현; 런타임 검증은 미실행 | P0 |
+| 오류 처리 | `try/catch/finally`, `throw ErrorKind;` | 파서·컴파일러·VM 경로 구현; 직접 C++ 빌드와 8개 회귀 사례 및 예제 실행 확인. CMake/CTest는 로컬에 CMake가 없어 미실행 | P0 |
 | 모듈 | `import {...} from {...};`, `export {...};`, `like (...)` | built-in import만 지원 | P1 |
 | 클래스·객체 | `class`, 공개 기본, `#`/`private`, `static`, `@` | 일부 런타임 존재, 표면 지원 불완전 | P1 |
 | 타입 시스템 | 선언 타입, 검사·변환, alias, generic, union | 초기 런타임 타입 검사; 정적 analyzer·alias·generic 미구현 | P0/P1 |

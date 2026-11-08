@@ -206,10 +206,10 @@ bool values_equal(const Value& left, const Value& right) {
         return *value == std::get<std::shared_ptr<QueueObject>>(right.data);
     const auto& tuple = std::get<std::shared_ptr<TupleObject>>(left.data);
     const auto& other = std::get<std::shared_ptr<TupleObject>>(right.data);
-    if (*tuple == *other) return true;
-    if (!*tuple || !*other || (*tuple)->values.size() != (*other)->values.size()) return false;
-    for (std::size_t i = 0; i < (*tuple)->values.size(); ++i)
-        if (!values_equal((*tuple)->values[i], (*other)->values[i])) return false;
+    if (tuple == other) return true;
+    if (!tuple || !other || tuple->values.size() != other->values.size()) return false;
+    for (std::size_t i = 0; i < tuple->values.size(); ++i)
+        if (!values_equal(tuple->values[i], other->values[i])) return false;
     return true;
 }
 

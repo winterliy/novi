@@ -327,11 +327,8 @@ StmtPtr Parser::function_declaration(bool is_async, bool is_static, bool is_priv
     try { body = block_contents(); }
     catch (...) { loop_depth_ = enclosing_loop_depth; throw; }
     loop_depth_ = enclosing_loop_depth;
-    FunctionDeclStmt function{name.lexeme, std::move(parameters), std::move(body)};
-    function.is_async = is_async;
-    function.is_static = is_static;
-    function.is_private = is_private;
-    function.attributes = std::move(attributes);
+    FunctionDeclStmt function{name.lexeme, std::move(parameters), std::move(body),
+                              is_async, is_static, is_private, std::move(attributes)};
     return std::make_unique<Stmt>(name.span, std::move(function));
 }
 
@@ -515,7 +512,7 @@ StmtPtr Parser::statement(std::vector<std::string>) {
             report(peek(), "A try block requires catch(error), finally, or both");
             throw ParseFailure{};
         }
-        const std::size_t end = finally_body ? finally_body->span.end : catch_body->span.end;
+        const SourceLocation end = finally_body ? finally_body->span.end : catch_body->span.end;
         return std::make_unique<Stmt>(SourceSpan{start.span.start, end},
             TryStmt{std::move(body), std::move(error_name), std::move(catch_body), std::move(finally_body)});
     }

@@ -43,8 +43,8 @@ std::size_t string_codepoint_count(const std::string& value) {
 
 VM::VM(std::ostream& output) : output_(output) {
     globals_ = make_environment();
-    define_native("print", 1, [](VM&, const std::vector<Value>& arguments, const SourceSpan&) {
-        output_ << value_to_string(arguments.front()) << '\n';
+    define_native("print", 1, [](VM& vm, const std::vector<Value>& arguments, const SourceSpan&) {
+        vm.output_ << value_to_string(arguments.front()) << '\n';
         return Value{};
     });
     define_native("mod", 2, [](VM&, const std::vector<Value>& arguments, const SourceSpan&) {
@@ -389,6 +389,7 @@ Value VM::execute() {
             case OpCode::PopExceptionHandler:
                 if (exception_handlers_.empty() || exception_handlers_.back().frame_index != frames_.size() - 1)
                     fail("Exception handler stack is unbalanced", instruction.span);
+                frame.environment = exception_handlers_.back().environment;
                 exception_handlers_.pop_back();
                 break;
             case OpCode::Throw:

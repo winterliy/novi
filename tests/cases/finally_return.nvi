@@ -1,0 +1,12 @@
+import {novi} from {novi};
+
+vari finalized : integer = 0;
+function calculate() {
+    try {
+        return 7;
+    } finally {
+        finalized = finalized + 1;
+    }
+}
+console.print(calculate():string);
+console.print(finalized:string);

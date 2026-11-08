@@ -1,0 +1,11 @@
+import {novi} from {novi};
+
+vari finalized : integer = 0;
+during (true) {
+    try {
+        break;
+    } finally {
+        finalized = finalized + 1;
+    }
+}
+console.print(finalized:string);
