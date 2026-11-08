@@ -90,6 +90,11 @@ ExprPtr Parser::assignment() {
             return std::make_unique<Expr>(SourceSpan{left->span.start, value->span.end},
                 AssignExpr{variable->name, std::move(value)});
         }
+        if (auto* property = std::get_if<GetPropertyExpr>(&left->node)) {
+            const SourceSpan span{left->span.start, value->span.end};
+            return std::make_unique<Expr>(span,
+                SetPropertyExpr{std::move(property->object), property->name, std::move(value)});
+        }
         if (auto* index = std::get_if<IndexExpr>(&left->node)) {
             return std::make_unique<Expr>(SourceSpan{left->span.start, value->span.end},
                 AssignIndexExpr{std::move(index->object), std::move(index->index), std::move(value)});

@@ -1,0 +1,8 @@
+class Counter {
+    function init(start) { this.value = start; }
+    function get() { output(this.value); }
+}
+vari counter : = Counter(5);
+console.print(counter.get():string);
+counter.value = 7;
+console.print(counter.value:string);
