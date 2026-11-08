@@ -22,4 +22,4 @@ Configure with `-DNOVI_BUILD_BENCHMARKS=ON`, then run `build/novi_vm_benchmark` 
 
 ## Mixed string length
 
-Run `python3 benchmarks/mixed_text.py build/novi` to measure 30,000 length calls on a 1,000-codepoint alternating Korean/ASCII string, including process startup and compilation. With the C++ backend on the same Apple arm64 machine, five runs had medians 0.11545 s before limiting the native prefix scan to the first segment and 0.11215 s afterwards. The samples overlap, so this result alone does not establish a reliable speedup; the change bounds native calls to one per length operation.
+Run `python3 benchmarks/mixed_text.py build/novi` to measure 30,000 length calls on a 1,000-codepoint alternating Korean/ASCII string, including process startup and compilation. The script verifies the computed length. An attempted single-prefix scan was reverted after ten alternating measurements on this machine showed a median of 0.11618 s compared with 0.10721 s for the original approach (earlier single-batch samples overlapped). Those measurements used the previous variant of this workload; do not compare them directly to the current script.
