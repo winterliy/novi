@@ -15,9 +15,9 @@ Novi의 실행 성능 최적화 목표를 유지한다. 기능 수를 늘리는 
 
 ## 현재 확인한 기반
 
-현재 코드에는 lexer, recursive-descent parser, AST, 바이트코드 compiler, stack VM이 있다. 소스 코드는 `.nvi`이며, `vari`/`let`/기존 변수 freeze, 함수·클래스 일부, 동기 조건/루프, `foreach`와 정수 `range`, 출력, 캐스트, REPL 및 `novi new` 프로젝트 scaffold가 있다. `range`는 지연 수열이며 종착값 제외, 0이 아닌 정수 간격을 사용한다. P0 시작 구현은 dictionary·list/set/queue의 기본 API, `and`/`or` 단락 평가, 선언 타입과 재대입 타입 검사를 포함한다. 이는 아직 빌드나 런타임 검증을 수행한 상태를 뜻하지 않는다.
+현재 코드에는 lexer, recursive-descent parser, AST, 바이트코드 compiler, stack VM이 있다. 소스 코드는 `.nvi`이며, `vari`/`let`/기존 변수 freeze, 함수·클래스 일부, 동기 조건/루프, `foreach`와 정수 `range`, 출력, 캐스트, REPL 및 `novi new` 프로젝트 scaffold가 있다. `range`는 지연 수열이며 종착값 제외, 0이 아닌 정수 간격을 사용한다. P0 시작 구현은 dictionary·list/set/queue의 기본 API, `and`/`or` 단락 평가, 선언 타입과 재대입 타입 검사를 포함한다. CMake Release 빌드와 등록된 CTest 사례를 실행했으며 기능 전체의 완전성을 보증하는 범위는 아니다.
 
-파서/VM 지원 여부는 기능별로 다르므로 문서의 `implemented` 상태는 소스 구조에 대한 이번 작업 시점의 확인이며, 런타임 적합성 테스트 결과를 의미하지 않는다.
+파서/VM 지원 여부와 테스트 범위는 기능별로 다르다. 자세한 검증 내역은 세션 기록을 따른다.
 
 ## 기능 분류와 Novi 표기 초안
 
@@ -27,10 +27,10 @@ Novi의 실행 성능 최적화 목표를 유지한다. 기능 수를 늘리는 
 | 조건과 반복 | `is/also/isnothing`, 별칭 `if/elif/else`, `during`, `reflex`, `foreach`, `break`, `continue` | 구현 일부; 반복 제어 연결 | P0 |
 | 함수·lambda·재귀·클로저 | `function NAME (...) {}`, `function {...} then ...`, `output(...)` | 구현 일부 | P0 |
 | 배열·문자열·map/set/queue | 합의된 타입 이름과 `foreach`, 인덱스 0 기반 | dictionary, tuple, list(`extend/insert/pop(index?)` 포함)·set·queue 기본 API; 문자열 인덱싱·순회·`length()`는 UTF-8 코드포인트 기준 | P0 |
-| 오류 처리 | `try/catch/finally`, `throw ErrorKind;` | 파서·컴파일러·VM 경로 구현; 직접 C++ 빌드와 8개 회귀 사례 및 예제 실행 확인. CMake/CTest는 로컬에 CMake가 없어 미실행 | P0 |
+| 오류 처리 | `try/catch/finally`, `throw ErrorKind;` | 파서·컴파일러·VM 경로 구현; catch와 finally 제어 흐름 회귀 사례를 CTest로 확인 | P0 |
 | 모듈 | `import {...} from {...};`, `export {...};`, `like (...)` | built-in import만 지원 | P1 |
 | 클래스·객체 | `class`, 공개 기본, `#`/`private`, `static`, `@` | 일부 런타임 존재, 표면 지원 불완전 | P1 |
-| 타입 시스템·이름 해석 | 선언 타입, 검사·변환, alias, generic, union | 컴파일 전 lexical resolver가 일반 소스의 미정의 이름을 검사; REPL은 세션 전역을 보존하려고 런타임 처리. 정적 타입 analyzer·초기화 상태·alias·generic은 미구현 | P0/P1 |
+| 타입 시스템·이름 해석 | 선언 타입, 검사·변환, alias, generic, union | 일반 소스의 미정의 이름, let 재대입과 일부 리터럴 타입을 컴파일 전에 검사; REPL과 동적 타입은 실행 시 검사. 초기화 상태·alias·generic은 미구현 | P0/P1 |
 | 표준 라이브러리 | `import {novi} from {novi};` | 출력·range 등 일부 내장; 모듈 registry 정리 필요 | P1 |
 | 프로젝트 빌드·패키지 | `novi new`, 추후 `novi build/run/add` | scaffold만 구현 | P1 |
 | 반복자·generator | `range` 지연 수열을 시작점으로 단계적 확장 | range 한정 | P2 |
