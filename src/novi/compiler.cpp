@@ -230,8 +230,12 @@ private:
                     function_->chunk.code[static_cast<std::size_t>(handler)].operand =
                         static_cast<int>(function_->chunk.code.size());
                     ++exception_depth_;
+                    // The VM creates a scope for the catch binding on entry.
+                    ++scope_depth_;
                     if (node.finally_body) active_finalizers_.push_back(node.finally_body.get());
                     compile_statement(*node.catch_body);
+                    emit(OpCode::ExitScope, 0, statement.span);
+                    --scope_depth_;
                     emit(OpCode::PopExceptionHandler, 0, statement.span);
                     --exception_depth_;
                     if (node.finally_body) {

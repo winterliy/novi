@@ -1,0 +1,10 @@
+vari count : integer = 0;
+during (true) {
+    try { throw Bad; } catch (error) {
+        count = count + 1;
+        break;
+    } finally {
+        count = count + 10;
+    }
+}
+console.print(count:string);

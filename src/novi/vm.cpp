@@ -395,11 +395,7 @@ Value VM::execute() {
             case OpCode::PopExceptionHandler:
                 if (exception_handlers_.empty() || exception_handlers_.back().frame_index != frames_.size() - 1)
                     fail("Exception handler stack is unbalanced", instruction.span);
-                // A normal handler pop must preserve any lexical scope still active
-                // in the try body (for example, an inline finally on continue).
-                // A caught handler owns a temporary catch environment that must end.
-                if (exception_handlers_.back().caught)
-                    frame.environment = exception_handlers_.back().environment;
+                // Scope exits are compiled separately for normal and abrupt flow.
                 exception_handlers_.pop_back();
                 break;
             case OpCode::Throw:
