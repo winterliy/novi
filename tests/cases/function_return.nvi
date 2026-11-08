@@ -1,0 +1,5 @@
+function double(value) {
+    output(value * 2);
+}
+vari result : integer = double(3);
+console.print(result:string);

@@ -33,10 +33,11 @@ function(assert_semantic_failure name expected_message)
 endfunction()
 
 foreach(name IN ITEMS tuple_equality finally_loop_local finally_continue finally_break finally_return
-        finally_throw catch_finally catch_scope string_ascii_mixed)
+        finally_throw catch_finally catch_scope string_ascii_mixed function_return)
     assert_case("${name}")
 endforeach()
 
+assert_semantic_failure(return_outside "return is only valid inside a function")
 assert_semantic_failure(undefined_name "Undefined name 'missing_name'")
 assert_semantic_failure(catch_out_of_scope "Undefined name 'caught_error'")
 assert_semantic_failure(constant_reassignment "Cannot reassign constant 'limit'")

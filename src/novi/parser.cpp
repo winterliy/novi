@@ -239,6 +239,7 @@ ExprPtr Parser::primary() {
         std::vector<StmtPtr> body;
         const int enclosing_loop_depth = loop_depth_;
         loop_depth_ = 0;
+        ++function_depth_;
         try {
             if (check(TokenKind::LeftBrace)) {
                 consume(TokenKind::LeftBrace, "Expected lambda body");
@@ -247,7 +248,8 @@ ExprPtr Parser::primary() {
                 StmtPtr command = statement();
                 body.push_back(std::move(command));
             }
-        } catch (...) { loop_depth_ = enclosing_loop_depth; throw; }
+        } catch (...) { --function_depth_; loop_depth_ = enclosing_loop_depth; throw; }
+        --function_depth_;
         loop_depth_ = enclosing_loop_depth;
         return std::make_unique<Expr>(SourceSpan{start.span.start, previous().span.end},
             LambdaExpr{std::move(parameters), std::move(body)});
@@ -323,9 +325,11 @@ StmtPtr Parser::function_declaration(bool is_async, bool is_static, bool is_priv
     consume(TokenKind::LeftBrace, "Expected '{' before function body");
     const int enclosing_loop_depth = loop_depth_;
     loop_depth_ = 0;
+    ++function_depth_;
     std::vector<StmtPtr> body;
     try { body = block_contents(); }
-    catch (...) { loop_depth_ = enclosing_loop_depth; throw; }
+    catch (...) { --function_depth_; loop_depth_ = enclosing_loop_depth; throw; }
+    --function_depth_;
     loop_depth_ = enclosing_loop_depth;
     FunctionDeclStmt function{name.lexeme, std::move(parameters), std::move(body),
                               is_async, is_static, is_private, std::move(attributes)};
@@ -542,6 +546,10 @@ StmtPtr Parser::statement(std::vector<std::string>) {
     }
     if (match_name("output") || match_name("return")) {
         const Token start = previous();
+        if (function_depth_ == 0) {
+            report(start, "return is only valid inside a function");
+            throw ParseFailure{};
+        }
         ExprPtr value;
         if (!check(TokenKind::Semicolon) && !check(TokenKind::RightBrace) && !at_end()) value = expression();
         optional_semicolon();
