@@ -1,0 +1,2 @@
+console.print('must not run');
+function example(value, value) { output(value); }

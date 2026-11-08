@@ -37,6 +37,8 @@ foreach(name IN ITEMS tuple_equality finally_loop_local finally_continue finally
     assert_case("${name}")
 endforeach()
 
+assert_semantic_failure(duplicate_parameter "Duplicate parameter 'value'")
+assert_semantic_failure(duplicate_lambda_parameter "Duplicate parameter 'value'")
 assert_semantic_failure(return_outside "return is only valid inside a function")
 assert_semantic_failure(undefined_name "Undefined name 'missing_name'")
 assert_semantic_failure(catch_out_of_scope "Undefined name 'caught_error'")

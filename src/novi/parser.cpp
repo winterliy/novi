@@ -228,7 +228,14 @@ ExprPtr Parser::primary() {
         consume(TokenKind::LeftBrace, "Expected '{' before lambda parameters");
         std::vector<std::string> parameters;
         if (!check(TokenKind::RightBrace)) {
-            do { parameters.push_back(consume_name("Expected lambda parameter").lexeme); }
+            do {
+                const Token& parameter = consume_name("Expected lambda parameter");
+                if (std::find(parameters.begin(), parameters.end(), parameter.lexeme) != parameters.end()) {
+                    report(parameter, "Duplicate parameter '" + parameter.lexeme + "'");
+                    throw ParseFailure{};
+                }
+                parameters.push_back(parameter.lexeme);
+            }
             while (match(TokenKind::Comma));
         }
         consume(TokenKind::RightBrace, "Expected '}' after lambda parameters");
@@ -279,7 +286,14 @@ std::vector<std::string> Parser::parameter_list() {
     std::vector<std::string> parameters;
     consume(TokenKind::LeftParen, "Expected '('");
     if (!check(TokenKind::RightParen)) {
-        do { parameters.push_back(consume_name("Expected parameter name").lexeme); }
+        do {
+            const Token& parameter = consume_name("Expected parameter name");
+            if (std::find(parameters.begin(), parameters.end(), parameter.lexeme) != parameters.end()) {
+                report(parameter, "Duplicate parameter '" + parameter.lexeme + "'");
+                throw ParseFailure{};
+            }
+            parameters.push_back(parameter.lexeme);
+        }
         while (match(TokenKind::Comma));
     }
     consume(TokenKind::RightParen, "Expected ')' after parameters");
