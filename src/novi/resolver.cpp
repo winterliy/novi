@@ -214,6 +214,11 @@ void Resolver::resolve_expression(const Expr& expression) {
             resolve_expression(*node.object);
             resolve_expression(*node.index);
             resolve_expression(*node.value);
+        },
+        [&](const CompoundAssignIndexExpr& node) {
+            resolve_expression(*node.object);
+            resolve_expression(*node.index);
+            resolve_expression(*node.value);
         }
     }, expression.node);
 }

@@ -403,6 +403,15 @@ private:
                 compile_expression(*node.index);
                 compile_expression(*node.value);
                 emit(OpCode::SetIndex, 0, expression.span);
+            },
+            [&](const CompoundAssignIndexExpr& node) {
+                compile_expression(*node.object);
+                compile_expression(*node.index);
+                emit(OpCode::DuplicatePair, 0, expression.span);
+                emit(OpCode::GetIndex, 0, expression.span);
+                compile_expression(*node.value);
+                emit(node.op == BinaryOperator::Add ? OpCode::Add : OpCode::Subtract, 0, expression.span);
+                emit(OpCode::SetIndex, 0, expression.span);
             }
         }, expression.node);
     }

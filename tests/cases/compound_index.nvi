@@ -1,0 +1,18 @@
+vari calls : integer = 0;
+function index() { calls += 1; output(0); }
+vari values : = list();
+values.append(4);
+values[index()] += 3;
+values[index()] -= 2;
+console.print(values[0]:string);
+console.print(calls:string);
+vari map : = dictionary();
+map['key'] = 10;
+map['key'] += 5;
+console.print(map['key']:string);
+vari objectCalls : integer = 0;
+function getValues() { objectCalls += 1; output(values); }
+getValues()[index()] += 1;
+console.print(objectCalls:string);
+console.print(calls:string);
+console.print(values[0]:string);

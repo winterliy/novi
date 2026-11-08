@@ -268,6 +268,14 @@ Value VM::execute() {
             case OpCode::True: stack_.emplace_back(true); break;
             case OpCode::False: stack_.emplace_back(false); break;
             case OpCode::Pop: pop(instruction.span); break;
+            case OpCode::DuplicatePair: {
+                if (stack_.size() < 2) fail("Operand stack underflow", instruction.span);
+                const Value first = stack_[stack_.size() - 2];
+                const Value second = stack_.back();
+                stack_.push_back(first);
+                stack_.push_back(second);
+                break;
+            }
             case OpCode::ToBoolean: stack_.emplace_back(value_is_truthy(pop(instruction.span))); break;
             case OpCode::GetName: stack_.push_back(frame.environment->get(name_at(frame, instruction.operand, instruction.span), instruction.span)); break;
             case OpCode::DefineName: frame.environment->define(name_at(frame, instruction.operand, instruction.span), pop(instruction.span)); break;
