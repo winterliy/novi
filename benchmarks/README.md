@@ -19,3 +19,7 @@ Configure with `-DNOVI_BUILD_BENCHMARKS=ON`, then run `build/novi_vm_benchmark` 
 ## ASCII prefix backend
 
 `-DNOVI_ASCII_BACKEND=cpp|rust|asm` selects the implementation of the C ABI used by string length; C++ is the default. Rust requires `rustc`; ASM currently supports macOS arm64 only. With `-DNOVI_BUILD_BENCHMARKS=ON`, run `novi_ascii_benchmark` to time 20,000 scans of 4,096 ASCII bytes, with result validation. On this Apple arm64 machine, Release builds and five runs yielded median seconds: C++ 0.026769, Rust 0.026758, ASM 0.027442. This isolated workload does not establish an overall VM speedup. CTest passed for all three backends, including ASCII boundary and mixed Unicode string cases.
+
+## Mixed string length
+
+Run `python3 benchmarks/mixed_text.py build/novi` to measure 30,000 length calls on a 1,000-codepoint alternating Korean/ASCII string, including process startup and compilation. With the C++ backend on the same Apple arm64 machine, five runs had medians 0.11545 s before limiting the native prefix scan to the first segment and 0.11215 s afterwards. The samples overlap, so this result alone does not establish a reliable speedup; the change bounds native calls to one per length operation.
