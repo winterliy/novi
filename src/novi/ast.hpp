@@ -76,7 +76,14 @@ struct TryStmt {
     StmtPtr catch_body;
     StmtPtr finally_body;
 };
-struct FieldDeclStmt { std::string name; ExprPtr initializer; bool is_static = false; bool is_private = false; };
+struct FieldDeclStmt {
+    std::string name;
+    ExprPtr initializer;
+    std::string fixed_type;
+    bool is_constant = false;
+    bool is_static = false;
+    bool is_private = false;
+};
 struct ClassDeclStmt {
     std::string name;
     std::optional<std::string> superclass;

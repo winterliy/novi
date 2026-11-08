@@ -140,6 +140,14 @@ void Resolver::resolve_statement(const Stmt& statement) {
         [&](const ClassDeclStmt& node) {
             declare(node.name);
             if (node.superclass) require_name(*node.superclass, statement.span);
+            for (const auto& field : node.fields) {
+                if (field.initializer) {
+                    begin_scope();
+                    declare("this");
+                    resolve_expression(*field.initializer);
+                    end_scope();
+                }
+            }
             for (const auto& method : node.methods) resolve_function(method, true);
         },
         [&](const ImportStmt&) {},

@@ -1,0 +1,3 @@
+class Example { vari count : integer = 5; }
+vari instance : = Example();
+instance.count = 'wrong';

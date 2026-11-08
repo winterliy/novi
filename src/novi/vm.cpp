@@ -588,6 +588,8 @@ Value VM::execute() {
                 auto klass = std::make_shared<ClassObject>();
                 klass->name = prototype.name;
                 klass->superclass = std::move(superclass);
+                for (const auto& field : prototype.field_types)
+                    klass->field_types[field.first] = field.second;
                 for (const auto& method : prototype.methods) {
                     auto function = std::make_shared<FunctionObject>();
                     function->prototype = method.second;
@@ -877,6 +879,14 @@ Value VM::execute() {
                 const auto* instance_value = std::get_if<std::shared_ptr<InstanceObject>>(&object.data);
                 if (!instance_value) fail("Only instances have fields", instruction.span);
                 const std::string name = name_at(frame, instruction.operand, instruction.span);
+                for (auto klass = (*instance_value)->klass; klass; klass = klass->superclass) {
+                    const auto field = klass->field_types.find(name);
+                    if (field != klass->field_types.end()) {
+                        if (!field->second.empty() && !value_matches_type(value, field->second))
+                            fail("Assigned value does not match fixed type '" + field->second + "'", instruction.span);
+                        break;
+                    }
+                }
                 (*instance_value)->fields[name] = value;
                 stack_.push_back(std::move(value));
                 break;

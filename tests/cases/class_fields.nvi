@@ -1,0 +1,17 @@
+class Container {
+    vari values : list = list();
+    vari value : integer = 2;
+    vari copy : integer = this.value + 1;
+    function init(start) { this.value = start; }
+}
+vari first : = Container(4);
+vari second : = Container(6);
+first.values.append(9);
+console.print(first.value:string);
+console.print(first.copy:string);
+console.print(second.value:string);
+console.print(first.values.length():string);
+console.print(second.values.length():string);
+class Simple { vari count : integer = 3; }
+vari simple : = Simple();
+console.print(simple.count:string);

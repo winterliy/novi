@@ -407,14 +407,17 @@ StmtPtr Parser::class_declaration(std::vector<std::string>) {
             auto method = function_declaration(is_async, is_static, is_private);
             klass.methods.push_back(std::get<FunctionDeclStmt>(std::move(method->node)));
         } else if (match_name("vari")) {
+            if (is_private || is_static) {
+                report(previous(), "Private, static, and constant class fields are not yet supported");
+                throw ParseFailure{};
+            }
             auto field = variable_declaration(false, is_private, is_static);
-            const auto& decl = std::get<VariableDeclStmt>(field->node);
-            klass.fields.push_back({decl.name, nullptr, is_static, is_private});
+            auto& decl = std::get<VariableDeclStmt>(field->node);
+            klass.fields.push_back({decl.name, std::move(decl.initializer), decl.fixed_type,
+                                    decl.is_constant, is_static, is_private});
         } else if (match_name("let")) {
-            const bool constant = true;
-            auto field = variable_declaration(constant, is_private, is_static);
-            const auto& decl = std::get<VariableDeclStmt>(field->node);
-            klass.fields.push_back({decl.name, nullptr, is_static, is_private});
+            report(previous(), "Private, static, and constant class fields are not yet supported");
+            throw ParseFailure{};
         } else {
             report(peek(), "Expected a class field or function");
             throw ParseFailure{};

@@ -23,6 +23,23 @@ public:
         return function_;
     }
 
+    std::shared_ptr<FunctionPrototype> compile_initializer(const std::vector<FieldDeclStmt>& fields,
+                                                            const FunctionDeclStmt* initializer,
+                                                            const SourceSpan& span) {
+        for (const auto& field : fields) {
+            emit(OpCode::GetName, add_constant(std::string("this")), span);
+            if (field.initializer) compile_expression(*field.initializer);
+            else emit(OpCode::Null, 0, span);
+            emit(OpCode::SetProperty, add_constant(field.name), span);
+            emit(OpCode::Pop, 0, span);
+        }
+        if (initializer)
+            for (const auto& statement : initializer->body) compile_statement(*statement);
+        emit(OpCode::Null, 0, span);
+        emit(OpCode::Return, 0, span);
+        return function_;
+    }
+
     std::shared_ptr<FunctionPrototype> compile_program(const Program& program) {
         const bool echo = program.echo_last_expression && !program.statements.empty() &&
             std::holds_alternative<ExpressionStmt>(program.statements.back()->node);
@@ -259,10 +276,26 @@ private:
                 else emit(OpCode::Null, 0, statement.span);
                 ClassPrototype klass;
                 klass.name = node.name;
+                const FunctionDeclStmt* initializer = nullptr;
+                for (const auto& field : node.fields)
+                    klass.field_types.emplace_back(field.name, field.fixed_type);
                 for (const auto& method : node.methods) {
+                    if (method.name == "init" && !node.fields.empty()) {
+                        initializer = &method;
+                        continue;
+                    }
                     std::shared_ptr<FunctionPrototype> nested;
                     compile_function(method, statement.span, nested);
                     klass.methods.emplace_back(method.name, std::move(nested));
+                }
+                if (!node.fields.empty()) {
+                    auto nested = std::make_shared<FunctionPrototype>();
+                    nested->name = "init";
+                    if (initializer) nested->parameters = initializer->parameters;
+                    nested->declaration_span = statement.span;
+                    FunctionCompiler nested_compiler(nested);
+                    klass.methods.emplace_back("init", nested_compiler.compile_initializer(
+                        node.fields, initializer, statement.span));
                 }
                 function_->chunk.classes.push_back(std::move(klass));
                 emit(OpCode::DefineClass, static_cast<int>(function_->chunk.classes.size() - 1), statement.span);

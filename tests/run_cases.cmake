@@ -33,7 +33,7 @@ function(assert_semantic_failure name expected_message)
 endfunction()
 
 foreach(name IN ITEMS tuple_equality finally_loop_local finally_continue finally_break finally_return
-        finally_throw catch_finally catch_scope string_ascii_mixed function_return dynamic_declaration lambda_recursion catch_continue catch_break_finally returned_closure compound_assignment compound_index instance_property)
+        finally_throw catch_finally catch_scope string_ascii_mixed function_return dynamic_declaration lambda_recursion catch_continue catch_break_finally returned_closure compound_assignment compound_index instance_property class_fields)
     assert_case("${name}")
 endforeach()
 
@@ -42,6 +42,7 @@ assert_semantic_failure(duplicate_lambda_parameter "Duplicate parameter 'value'"
 assert_semantic_failure(return_outside "return is only valid inside a function")
 assert_semantic_failure(undefined_name "Undefined name 'missing_name'")
 assert_semantic_failure(catch_out_of_scope "Undefined name 'caught_error'")
+assert_semantic_failure(class_unsupported_field "class fields are not yet supported")
 assert_semantic_failure(compound_constant "Cannot reassign constant 'count'")
 assert_semantic_failure(constant_reassignment "Cannot reassign constant 'limit'")
 assert_semantic_failure(fixed_type_reassignment "does not match fixed type 'string'")
@@ -71,4 +72,11 @@ execute_process(
 string(FIND "${arity_error}" "expects 2 argument(s), got 1" arity_message_index)
 if(arity_result EQUAL 0 OR arity_message_index EQUAL -1)
     message(FATAL_ERROR "function_arity failed to report the expected call error: [${arity_error}]")
+endif()
+
+execute_process(COMMAND "${NOVI_EXECUTABLE}" "${TEST_CASE_DIR}/class_field_type.nvi"
+    RESULT_VARIABLE field_result ERROR_VARIABLE field_error)
+string(FIND "${field_error}" "Assigned value does not match fixed type 'integer'" field_message_index)
+if(field_result EQUAL 0 OR field_message_index EQUAL -1)
+    message(FATAL_ERROR "class_field_type did not reject the wrong type: [${field_error}]")
 endif()

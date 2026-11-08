@@ -40,6 +40,7 @@ struct Instruction {
 struct ClassPrototype {
     std::string name;
     std::vector<std::pair<std::string, std::shared_ptr<FunctionPrototype>>> methods;
+    std::vector<std::pair<std::string, std::string>> field_types;
 };
 
 struct Chunk {

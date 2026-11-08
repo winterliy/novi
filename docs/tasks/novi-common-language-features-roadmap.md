@@ -29,7 +29,7 @@ Novi의 실행 성능 최적화 목표를 유지한다. 기능 수를 늘리는 
 | 배열·문자열·map/set/queue | 합의된 타입 이름과 `foreach`, 인덱스 0 기반 | dictionary, tuple, list(`extend/insert/pop(index?)` 포함)·set·queue 기본 API; 문자열 인덱싱·순회·`length()`는 UTF-8 코드포인트 기준 | P0 |
 | 오류 처리 | `try/catch/finally`, `throw ErrorKind;` | 파서·컴파일러·VM 경로 구현; catch와 finally 제어 흐름 회귀 사례를 CTest로 확인 | P0 |
 | 모듈 | `import {...} from {...};`, `export {...};`, `like (...)` | built-in import만 지원 | P1 |
-| 클래스·객체 | `class`, 공개 기본, `#`/`private`, `static`, `@` | 일부 런타임 존재, 표면 지원 불완전 | P1 |
+| 클래스·객체 | `class`, 공개 기본, `#`/`private`, `static`, `@` | 공개 가변 필드는 인스턴스별 초기화와 타입 검사를 지원. 비공개·static·상수 필드는 명시적으로 미지원; 메서드 접근 제어 등은 미완성 | P1 |
 | 타입 시스템·이름 해석 | 선언 타입, 검사·변환, alias, generic, union | 일반 소스의 미정의 이름, let 재대입과 일부 리터럴 타입을 컴파일 전에 검사; REPL과 동적 타입은 실행 시 검사. 초기화 상태·alias·generic은 미구현 | P0/P1 |
 | 표준 라이브러리 | `import {novi} from {novi};` | 출력·range 등 일부 내장; 모듈 registry 정리 필요 | P1 |
 | 프로젝트 빌드·패키지 | `novi new`, 추후 `novi build/run/add` | scaffold만 구현 | P1 |
