@@ -1,0 +1,6 @@
+class Example { let count : integer = 5; }
+vari first : = Example();
+vari second : = Example();
+console.print(first.count:string);
+console.print(second.count:string);
+first.count = 9;

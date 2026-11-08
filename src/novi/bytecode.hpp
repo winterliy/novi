@@ -37,10 +37,16 @@ struct Instruction {
     int operand4 = 0;
 };
 
+struct ClassFieldPrototype {
+    std::string name;
+    std::string fixed_type;
+    bool is_constant = false;
+};
+
 struct ClassPrototype {
     std::string name;
     std::vector<std::pair<std::string, std::shared_ptr<FunctionPrototype>>> methods;
-    std::vector<std::pair<std::string, std::string>> field_types;
+    std::vector<ClassFieldPrototype> fields;
 };
 
 struct Chunk {

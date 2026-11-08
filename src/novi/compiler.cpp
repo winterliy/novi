@@ -278,7 +278,7 @@ private:
                 klass.name = node.name;
                 const FunctionDeclStmt* initializer = nullptr;
                 for (const auto& field : node.fields)
-                    klass.field_types.emplace_back(field.name, field.fixed_type);
+                    klass.fields.push_back({field.name, field.fixed_type, field.is_constant});
                 for (const auto& method : node.methods) {
                     if (method.name == "init" && !node.fields.empty()) {
                         initializer = &method;

@@ -588,8 +588,8 @@ Value VM::execute() {
                 auto klass = std::make_shared<ClassObject>();
                 klass->name = prototype.name;
                 klass->superclass = std::move(superclass);
-                for (const auto& field : prototype.field_types)
-                    klass->field_types[field.first] = field.second;
+                for (const auto& field : prototype.fields)
+                    klass->fields[field.name] = field;
                 for (const auto& method : prototype.methods) {
                     auto function = std::make_shared<FunctionObject>();
                     function->prototype = method.second;
@@ -880,10 +880,12 @@ Value VM::execute() {
                 if (!instance_value) fail("Only instances have fields", instruction.span);
                 const std::string name = name_at(frame, instruction.operand, instruction.span);
                 for (auto klass = (*instance_value)->klass; klass; klass = klass->superclass) {
-                    const auto field = klass->field_types.find(name);
-                    if (field != klass->field_types.end()) {
-                        if (!field->second.empty() && !value_matches_type(value, field->second))
-                            fail("Assigned value does not match fixed type '" + field->second + "'", instruction.span);
+                    const auto field = klass->fields.find(name);
+                    if (field != klass->fields.end()) {
+                        if (field->second.is_constant && (*instance_value)->fields.find(name) != (*instance_value)->fields.end())
+                            fail("Cannot reassign constant field '" + name + "'", instruction.span);
+                        if (!field->second.fixed_type.empty() && !value_matches_type(value, field->second.fixed_type))
+                            fail("Assigned value does not match fixed type '" + field->second.fixed_type + "'", instruction.span);
                         break;
                     }
                 }

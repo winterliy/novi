@@ -42,6 +42,7 @@ assert_semantic_failure(duplicate_lambda_parameter "Duplicate parameter 'value'"
 assert_semantic_failure(return_outside "return is only valid inside a function")
 assert_semantic_failure(undefined_name "Undefined name 'missing_name'")
 assert_semantic_failure(catch_out_of_scope "Undefined name 'caught_error'")
+assert_semantic_failure(class_duplicate_field "Duplicate class field 'count'")
 assert_semantic_failure(class_unsupported_field "class fields are not yet supported")
 assert_semantic_failure(compound_constant "Cannot reassign constant 'count'")
 assert_semantic_failure(constant_reassignment "Cannot reassign constant 'limit'")
@@ -79,4 +80,11 @@ execute_process(COMMAND "${NOVI_EXECUTABLE}" "${TEST_CASE_DIR}/class_field_type.
 string(FIND "${field_error}" "Assigned value does not match fixed type 'integer'" field_message_index)
 if(field_result EQUAL 0 OR field_message_index EQUAL -1)
     message(FATAL_ERROR "class_field_type did not reject the wrong type: [${field_error}]")
+endif()
+
+execute_process(COMMAND "${NOVI_EXECUTABLE}" "${TEST_CASE_DIR}/class_constant_field.nvi"
+    RESULT_VARIABLE constant_result OUTPUT_VARIABLE constant_output ERROR_VARIABLE constant_error)
+string(FIND "${constant_error}" "Cannot reassign constant field 'count'" constant_message_index)
+if(constant_result EQUAL 0 OR constant_message_index EQUAL -1 OR NOT constant_output STREQUAL "5\n5\n")
+    message(FATAL_ERROR "class_constant_field did not reject reassignment: [${constant_error}]")
 endif()

@@ -408,16 +408,36 @@ StmtPtr Parser::class_declaration(std::vector<std::string>) {
             klass.methods.push_back(std::get<FunctionDeclStmt>(std::move(method->node)));
         } else if (match_name("vari")) {
             if (is_private || is_static) {
-                report(previous(), "Private, static, and constant class fields are not yet supported");
+                report(previous(), "Private and static class fields are not yet supported");
                 throw ParseFailure{};
             }
             auto field = variable_declaration(false, is_private, is_static);
             auto& decl = std::get<VariableDeclStmt>(field->node);
+            if (std::any_of(klass.fields.begin(), klass.fields.end(),
+                            [&](const FieldDeclStmt& item) { return item.name == decl.name; })) {
+                report(previous(), "Duplicate class field '" + decl.name + "'");
+                throw ParseFailure{};
+            }
             klass.fields.push_back({decl.name, std::move(decl.initializer), decl.fixed_type,
                                     decl.is_constant, is_static, is_private});
         } else if (match_name("let")) {
-            report(previous(), "Private, static, and constant class fields are not yet supported");
-            throw ParseFailure{};
+            if (is_private || is_static) {
+                report(previous(), "Private and static class fields are not yet supported");
+                throw ParseFailure{};
+            }
+            auto field = variable_declaration(true, is_private, is_static);
+            auto& decl = std::get<VariableDeclStmt>(field->node);
+            if (std::any_of(klass.fields.begin(), klass.fields.end(),
+                            [&](const FieldDeclStmt& item) { return item.name == decl.name; })) {
+                report(previous(), "Duplicate class field '" + decl.name + "'");
+                throw ParseFailure{};
+            }
+            if (!decl.initializer) {
+                report(previous(), "A constant field needs an initial value");
+                throw ParseFailure{};
+            }
+            klass.fields.push_back({decl.name, std::move(decl.initializer), decl.fixed_type,
+                                    decl.is_constant, is_static, is_private});
         } else {
             report(peek(), "Expected a class field or function");
             throw ParseFailure{};

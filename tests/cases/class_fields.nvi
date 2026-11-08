@@ -1,4 +1,5 @@
 class Container {
+    let id : integer = 9;
     vari values : list = list();
     vari value : integer = 2;
     vari copy : integer = this.value + 1;
@@ -8,6 +9,7 @@ vari first : = Container(4);
 vari second : = Container(6);
 first.values.append(9);
 console.print(first.value:string);
+console.print(first.id:string);
 console.print(first.copy:string);
 console.print(second.value:string);
 console.print(first.values.length():string);
