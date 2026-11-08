@@ -18,7 +18,8 @@ Or compile directly with a C++17 compiler:
 ```sh
 c++ -std=c++17 -Wall -Wextra -Wpedantic -Isrc \
   src/main.cpp src/novi/compiler.cpp src/novi/lexer.cpp \
-  src/novi/parser.cpp src/novi/project.cpp src/novi/runtime.cpp src/novi/vm.cpp \
+  src/novi/parser.cpp src/novi/project.cpp src/novi/resolver.cpp \
+  src/novi/runtime.cpp src/novi/vm.cpp \
   -o novi
 ```
 

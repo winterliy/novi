@@ -1,4 +1,5 @@
 #include "compiler.hpp"
+#include "resolver.hpp"
 
 #include <type_traits>
 #include <utility>
@@ -413,10 +414,14 @@ private:
 }  // namespace
 
 CompiledModule Compiler::compile(const Program& program) {
+    CompiledModule module;
+    if (!program.echo_last_expression) {
+        module.diagnostics = Resolver().resolve(program);
+        if (!module.diagnostics.empty()) return module;
+    }
     auto entry = std::make_shared<FunctionPrototype>();
     entry->name = "<main>";
     FunctionCompiler compiler(entry);
-    CompiledModule module;
     module.entry = compiler.compile_program(program);
     return module;
 }

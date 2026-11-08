@@ -30,7 +30,7 @@ Novi의 실행 성능 최적화 목표를 유지한다. 기능 수를 늘리는 
 | 오류 처리 | `try/catch/finally`, `throw ErrorKind;` | 파서·컴파일러·VM 경로 구현; 직접 C++ 빌드와 8개 회귀 사례 및 예제 실행 확인. CMake/CTest는 로컬에 CMake가 없어 미실행 | P0 |
 | 모듈 | `import {...} from {...};`, `export {...};`, `like (...)` | built-in import만 지원 | P1 |
 | 클래스·객체 | `class`, 공개 기본, `#`/`private`, `static`, `@` | 일부 런타임 존재, 표면 지원 불완전 | P1 |
-| 타입 시스템 | 선언 타입, 검사·변환, alias, generic, union | 초기 런타임 타입 검사; 정적 analyzer·alias·generic 미구현 | P0/P1 |
+| 타입 시스템·이름 해석 | 선언 타입, 검사·변환, alias, generic, union | 컴파일 전 lexical resolver가 일반 소스의 미정의 이름을 검사; REPL은 세션 전역을 보존하려고 런타임 처리. 정적 타입 analyzer·초기화 상태·alias·generic은 미구현 | P0/P1 |
 | 표준 라이브러리 | `import {novi} from {novi};` | 출력·range 등 일부 내장; 모듈 registry 정리 필요 | P1 |
 | 프로젝트 빌드·패키지 | `novi new`, 추후 `novi build/run/add` | scaffold만 구현 | P1 |
 | 반복자·generator | `range` 지연 수열을 시작점으로 단계적 확장 | range 한정 | P2 |
@@ -49,7 +49,7 @@ P0는 언어로 작은 프로그램을 작성하고 안전하게 실행하는 �
 ### 단계 A — 언어 핵심 완결 (P0)
 
 1. lexer/parser/AST/VM 간 지원 목록을 기능별로 일치시킨다.
-2. 변수 scope, 초기화 전 읽기, 상수 binding, 타입 재대입 규칙을 의미 분석에서 검사한다.
+2. lexical scope와 미정의 이름을 의미 분석에서 검사한다. 초기화 전 읽기, 상수 binding, 타입 재대입 규칙은 후속으로 포함한다. 사용자 모듈 export 이름은 모듈 해석 구현까지 검사를 보류한다.
 3. 함수 인자/반환, 재귀, lambda capture와 호출 오류를 일관되게 만든다.
 4. `break;`/`continue;`를 지원하고, 반복문 밖 사용은 파싱 오류로 거부한다.
 5. list, tuple, dictionary, set, queue와 공통 iterable 프로토콜을 도입한다. `foreach (key, value in map)`을 포함한다.

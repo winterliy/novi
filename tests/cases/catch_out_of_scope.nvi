@@ -1,0 +1,6 @@
+try {
+    throw InvalidValue;
+} catch (caught_error) {
+    console.print('caught');
+}
+console.print(caught_error:string);

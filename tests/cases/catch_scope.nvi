@@ -3,9 +3,6 @@ import {novi} from {novi};
 try {
     throw InvalidValue;
 } catch (caught_error) {
+    console.print('caught');
 }
-try {
-    console.print(caught_error:string);
-} catch (scope_error) {
-    console.print('scoped');
-}
+console.print('outside');

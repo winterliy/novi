@@ -1,0 +1,4 @@
+import {novi} from {novi};
+
+console.print('program started');
+console.print(missing_name:string);

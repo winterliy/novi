@@ -50,5 +50,16 @@
 ### 다음 작업
 
 1. CMake가 설치된 CI나 개발 환경에서 configure/build/CTest를 실행해 CTest 등록까지 확인한다.
-2. catch 변수와 lexical scope, 타입 오류, 미정의 이름을 컴파일 전에 진단할 semantic analyzer의 범위를 정하고 구현한다.
+2. resolver 다음 단계로 초기화 전 읽기, 타입 재대입·상수 binding 진단을 추가하고 shadowing 규칙을 확정한다.
 3. 작은 VM benchmark를 추가한 뒤 실제 병목만 대상으로 C++ 최적화를 검토한다. Rust/asm은 C++ baseline보다 유의미한 이득이 측정되는 경로에만 고려한다.
+
+### 2026-11-08 후속 구현 — 미정의 이름 검사
+
+- 새 `Resolver`가 lexical scope를 따라 변수·함수·매개변수·반복 변수·catch 변수의 이름을 확인한다.
+- 미정의 읽기/대입/constant 전환/상위 클래스 참조를 컴파일 전에 의미 진단으로 보고하고 바이트코드 실행을 막는다.
+- 사용자 모듈 `export`는 아직 로더·모듈 scope가 없어 이름 검증을 보류하고, 실제 export 검증은 모듈 해석 단계로 남긴다.
+- 현재 REPL은 이전 입력에서 선언한 이름을 유지하기 위해 정적 resolver를 건너뛰며, 실행 시 VM 검사를 사용한다.
+- `undefined_name`과 catch 변수 범위 밖 참조 회귀 사례는 컴파일 전 오류로 거부되고 선행 출력이 발생하지 않음을 확인한다. catch 내부에서 변수 사용과 catch 종료 뒤 환경 복원을 실행 사례로 확인한다.
+- 현재 CMake/CTest 미설치 제약은 그대로다. CTest 등록 실행은 다음 환경에서 확인할 것.
+
+다음 단계는 CMake/CTest를 CI에서 실행하고, 초기화 전 읽기 및 타입 재대입·상수 binding 검사로 의미 분석을 확장하는 것이다. Shadowing 정책은 언어 프런트 task에 미결로 남아 있어 구현 전에 확정한다.
