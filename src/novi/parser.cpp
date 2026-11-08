@@ -61,6 +61,21 @@ ExprPtr Parser::expression() { return assignment(); }
 
 ExprPtr Parser::assignment() {
     ExprPtr left = conditional();
+    if (match(TokenKind::PlusEqual) || match(TokenKind::MinusEqual)) {
+        const Token op = previous();
+        auto* variable = std::get_if<VariableExpr>(&left->node);
+        if (!variable) {
+            report(op, "Compound assignment currently requires a variable name");
+            throw ParseFailure{};
+        }
+        const std::string name = variable->name;
+        ExprPtr value = assignment();
+        const SourceSpan span{left->span.start, value->span.end};
+        ExprPtr combined = std::make_unique<Expr>(span, BinaryExpr{
+            op.kind == TokenKind::PlusEqual ? BinaryOperator::Add : BinaryOperator::Subtract,
+            std::move(left), std::move(value)});
+        return std::make_unique<Expr>(span, AssignExpr{name, std::move(combined)});
+    }
     if (match(TokenKind::Equal)) {
         const Token equals = previous();
         ExprPtr value = assignment();

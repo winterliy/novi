@@ -33,7 +33,7 @@ function(assert_semantic_failure name expected_message)
 endfunction()
 
 foreach(name IN ITEMS tuple_equality finally_loop_local finally_continue finally_break finally_return
-        finally_throw catch_finally catch_scope string_ascii_mixed function_return dynamic_declaration lambda_recursion catch_continue catch_break_finally returned_closure)
+        finally_throw catch_finally catch_scope string_ascii_mixed function_return dynamic_declaration lambda_recursion catch_continue catch_break_finally returned_closure compound_assignment)
     assert_case("${name}")
 endforeach()
 
@@ -42,6 +42,7 @@ assert_semantic_failure(duplicate_lambda_parameter "Duplicate parameter 'value'"
 assert_semantic_failure(return_outside "return is only valid inside a function")
 assert_semantic_failure(undefined_name "Undefined name 'missing_name'")
 assert_semantic_failure(catch_out_of_scope "Undefined name 'caught_error'")
+assert_semantic_failure(compound_constant "Cannot reassign constant 'count'")
 assert_semantic_failure(constant_reassignment "Cannot reassign constant 'limit'")
 assert_semantic_failure(fixed_type_reassignment "does not match fixed type 'string'")
 assert_semantic_failure(fixed_type_initializer "does not match fixed type 'string'")

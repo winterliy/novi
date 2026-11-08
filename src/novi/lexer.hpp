@@ -9,7 +9,7 @@ namespace novi {
 
 enum class TokenKind {
     Identifier, Number, String,
-    Plus, Minus, Star, Slash, FloorSlash, Percent,
+    Plus, Minus, PlusEqual, MinusEqual, Star, Slash, FloorSlash, Percent,
     Ampersand, Pipe, LogicalAnd, LogicalOr, Caret, Tilde, ShiftLeft, ShiftRight,
     Bang, Equal, EqualEqual, BangEqual, Less, LessEqual, Greater, GreaterEqual,
     Question, Colon, Dot, Comma, Semicolon,

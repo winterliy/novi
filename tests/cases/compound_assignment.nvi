@@ -1,0 +1,7 @@
+vari count : integer = 10;
+count += 7;
+count -= 3;
+console.print(count:string);
+vari text : string = 'a';
+text += 'b';
+console.print(text:string);

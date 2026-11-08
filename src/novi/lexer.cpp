@@ -102,8 +102,8 @@ LexResult Lexer::scan() const {
             return false;
         };
         switch (text[begin]) {
-            case '+': emit(TokenKind::Plus, begin, position); break;
-            case '-': emit(TokenKind::Minus, begin, position); break;
+            case '+': emit(take('=') ? TokenKind::PlusEqual : TokenKind::Plus, begin, position); break;
+            case '-': emit(take('=') ? TokenKind::MinusEqual : TokenKind::Minus, begin, position); break;
             case '*': emit(TokenKind::Star, begin, position); break;
             case '/':
                 if (!take('/')) {
