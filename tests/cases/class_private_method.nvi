@@ -1,0 +1,3 @@
+class Safe { # function hidden() { output(1); } }
+vari safe : = Safe();
+safe.hidden();

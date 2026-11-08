@@ -41,11 +41,18 @@ struct ClassFieldPrototype {
     std::string name;
     std::string fixed_type;
     bool is_constant = false;
+    bool is_private = false;
+};
+
+struct ClassMethodPrototype {
+    std::string name;
+    std::shared_ptr<FunctionPrototype> function;
+    bool is_private = false;
 };
 
 struct ClassPrototype {
     std::string name;
-    std::vector<std::pair<std::string, std::shared_ptr<FunctionPrototype>>> methods;
+    std::vector<ClassMethodPrototype> methods;
     std::vector<ClassFieldPrototype> fields;
 };
 

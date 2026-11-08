@@ -1,0 +1,3 @@
+class Safe { # vari secret : integer = 3; }
+vari safe : = Safe();
+console.print(safe.secret:string);

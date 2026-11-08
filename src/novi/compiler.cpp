@@ -278,7 +278,7 @@ private:
                 klass.name = node.name;
                 const FunctionDeclStmt* initializer = nullptr;
                 for (const auto& field : node.fields)
-                    klass.fields.push_back({field.name, field.fixed_type, field.is_constant});
+                    klass.fields.push_back({field.name, field.fixed_type, field.is_constant, field.is_private});
                 for (const auto& method : node.methods) {
                     if (method.name == "init" && !node.fields.empty()) {
                         initializer = &method;
@@ -286,7 +286,7 @@ private:
                     }
                     std::shared_ptr<FunctionPrototype> nested;
                     compile_function(method, statement.span, nested);
-                    klass.methods.emplace_back(method.name, std::move(nested));
+                    klass.methods.push_back({method.name, std::move(nested), method.is_private});
                 }
                 if (!node.fields.empty()) {
                     auto nested = std::make_shared<FunctionPrototype>();
@@ -294,8 +294,8 @@ private:
                     if (initializer) nested->parameters = initializer->parameters;
                     nested->declaration_span = statement.span;
                     FunctionCompiler nested_compiler(nested);
-                    klass.methods.emplace_back("init", nested_compiler.compile_initializer(
-                        node.fields, initializer, statement.span));
+                    klass.methods.push_back({"init", nested_compiler.compile_initializer(
+                        node.fields, initializer, statement.span), false});
                 }
                 function_->chunk.classes.push_back(std::move(klass));
                 emit(OpCode::DefineClass, static_cast<int>(function_->chunk.classes.size() - 1), statement.span);

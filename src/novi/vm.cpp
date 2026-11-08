@@ -570,6 +570,7 @@ Value VM::execute() {
                 auto function = std::make_shared<FunctionObject>();
                 function->prototype = functions[static_cast<std::size_t>(instruction.operand)];
                 function->closure = frame.environment;
+                function->owner_class = frame.function->owner_class;
                 retain_closure_environment(frame.environment);
                 stack_.emplace_back(function);
                 break;
@@ -592,10 +593,12 @@ Value VM::execute() {
                     klass->fields[field.name] = field;
                 for (const auto& method : prototype.methods) {
                     auto function = std::make_shared<FunctionObject>();
-                    function->prototype = method.second;
+                    function->prototype = method.function;
                     function->closure = frame.environment;
+                    function->owner_class = klass;
+                    function->is_private = method.is_private;
                     retain_closure_environment(frame.environment);
-                    klass->methods[method.first] = std::move(function);
+                    klass->methods[method.name] = std::move(function);
                 }
                 frame.environment->define(klass->name, Value(klass));
                 break;
@@ -863,9 +866,19 @@ Value VM::execute() {
                 const auto* instance_value = std::get_if<std::shared_ptr<InstanceObject>>(&object.data);
                 if (!instance_value) fail("Only instances have properties", instruction.span);
                 const std::string name = name_at(frame, instruction.operand, instruction.span);
+                for (auto klass = (*instance_value)->klass; klass; klass = klass->superclass) {
+                    const auto declared = klass->fields.find(name);
+                    if (declared != klass->fields.end()) {
+                        if (declared->second.is_private && frame.function->owner_class.lock() != klass)
+                            fail("Private field '" + name + "' is not accessible", instruction.span);
+                        break;
+                    }
+                }
                 const auto field = (*instance_value)->fields.find(name);
                 if (field != (*instance_value)->fields.end()) stack_.push_back(field->second);
                 else if (auto method = (*instance_value)->klass->find_method(name)) {
+                    if (method->is_private && frame.function->owner_class.lock() != method->owner_class.lock())
+                        fail("Private method '" + name + "' is not accessible", instruction.span);
                     auto bound = std::make_shared<BoundMethod>();
                     bound->function = std::move(method);
                     bound->receiver = *instance_value;
@@ -882,6 +895,8 @@ Value VM::execute() {
                 for (auto klass = (*instance_value)->klass; klass; klass = klass->superclass) {
                     const auto field = klass->fields.find(name);
                     if (field != klass->fields.end()) {
+                        if (field->second.is_private && frame.function->owner_class.lock() != klass)
+                            fail("Private field '" + name + "' is not accessible", instruction.span);
                         if (field->second.is_constant && (*instance_value)->fields.find(name) != (*instance_value)->fields.end())
                             fail("Cannot reassign constant field '" + name + "'", instruction.span);
                         if (!field->second.fixed_type.empty() && !value_matches_type(value, field->second.fixed_type))

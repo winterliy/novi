@@ -1,0 +1,10 @@
+class Safe {
+    # vari secret : integer = 3;
+    private function increment() { this.secret += 2; }
+    function reveal() { this.increment(); output(this.secret); }
+    function getReader() { vari reader : = function {} then output(this.secret); output(reader); }
+}
+vari safe : = Safe();
+console.print(safe.reveal():string);
+vari read : = safe.getReader();
+console.print(read():string);

@@ -33,7 +33,7 @@ function(assert_semantic_failure name expected_message)
 endfunction()
 
 foreach(name IN ITEMS tuple_equality finally_loop_local finally_continue finally_break finally_return
-        finally_throw catch_finally catch_scope string_ascii_mixed function_return dynamic_declaration lambda_recursion catch_continue catch_break_finally returned_closure compound_assignment compound_index instance_property class_fields)
+        finally_throw catch_finally catch_scope string_ascii_mixed function_return dynamic_declaration lambda_recursion catch_continue catch_break_finally returned_closure compound_assignment compound_index instance_property class_fields class_private)
     assert_case("${name}")
 endforeach()
 
@@ -88,3 +88,11 @@ string(FIND "${constant_error}" "Cannot reassign constant field 'count'" constan
 if(constant_result EQUAL 0 OR constant_message_index EQUAL -1 OR NOT constant_output STREQUAL "5\n5\n")
     message(FATAL_ERROR "class_constant_field did not reject reassignment: [${constant_error}]")
 endif()
+
+foreach(private_case IN ITEMS class_private_read class_private_write class_private_method)
+    execute_process(COMMAND "${NOVI_EXECUTABLE}" "${TEST_CASE_DIR}/${private_case}.nvi"
+        RESULT_VARIABLE private_result ERROR_VARIABLE private_error)
+    if(private_result EQUAL 0 OR NOT private_error MATCHES "is not accessible")
+        message(FATAL_ERROR "${private_case} did not reject external access: [${private_error}]")
+    endif()
+endforeach()

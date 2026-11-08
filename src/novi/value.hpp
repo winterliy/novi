@@ -129,6 +129,8 @@ struct NativeFunction {
 struct FunctionObject {
     std::shared_ptr<FunctionPrototype> prototype;
     std::weak_ptr<Environment> closure;
+    std::weak_ptr<ClassObject> owner_class;
+    bool is_private = false;
 };
 
 struct Environment {

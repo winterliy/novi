@@ -1,1 +1,1 @@
-class Example { private vari secret : integer = 5; }
+class Example { static vari global : integer = 5; }

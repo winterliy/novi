@@ -1,0 +1,3 @@
+class Safe { private vari secret : integer = 3; }
+vari safe : = Safe();
+safe.secret = 4;
