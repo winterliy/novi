@@ -20,6 +20,9 @@ target_compile_options(novi PRIVATE -Wall -Wextra -Wpedantic)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(novi_source_locations tests/source_locations.cpp)
+    target_include_directories(novi_source_locations PRIVATE src)
+    add_test(NAME novi_source_locations COMMAND novi_source_locations)
     add_test(
         NAME novi_runtime_regressions
         COMMAND ${CMAKE_COMMAND}

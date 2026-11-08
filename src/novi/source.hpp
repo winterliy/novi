@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <utility>
@@ -34,11 +35,8 @@ public:
 
     SourceLocation location(std::size_t offset) const {
         offset = offset > text_.size() ? text_.size() : offset;
-        std::size_t line_index = 0;
-        for (std::size_t i = 1; i < line_starts_.size(); ++i) {
-            if (line_starts_[i] > offset) break;
-            line_index = i;
-        }
+        const auto next_line = std::upper_bound(line_starts_.begin(), line_starts_.end(), offset);
+        const auto line_index = static_cast<std::size_t>(next_line - line_starts_.begin() - 1);
         return {name_, offset, first_line_ + line_index, offset - line_starts_[line_index] + 1};
     }
 
