@@ -1,0 +1,6 @@
+function makeAdder(x) {
+    vari adder : = function {y} then output(x + y);
+    output(adder);
+}
+vari addTwo : = makeAdder(2);
+console.print(addTwo(3):string);

@@ -33,7 +33,7 @@ function(assert_semantic_failure name expected_message)
 endfunction()
 
 foreach(name IN ITEMS tuple_equality finally_loop_local finally_continue finally_break finally_return
-        finally_throw catch_finally catch_scope string_ascii_mixed function_return dynamic_declaration lambda_recursion catch_continue catch_break_finally)
+        finally_throw catch_finally catch_scope string_ascii_mixed function_return dynamic_declaration lambda_recursion catch_continue catch_break_finally returned_closure)
     assert_case("${name}")
 endforeach()
 
@@ -62,3 +62,12 @@ function(assert_semantic_success name expected)
 endfunction()
 
 assert_semantic_success(undefined_export "")
+
+execute_process(
+    COMMAND "${NOVI_EXECUTABLE}" "${TEST_CASE_DIR}/function_arity.nvi"
+    RESULT_VARIABLE arity_result OUTPUT_VARIABLE arity_output ERROR_VARIABLE arity_error
+)
+string(FIND "${arity_error}" "expects 2 argument(s), got 1" arity_message_index)
+if(arity_result EQUAL 0 OR arity_message_index EQUAL -1)
+    message(FATAL_ERROR "function_arity failed to report the expected call error: [${arity_error}]")
+endif()
