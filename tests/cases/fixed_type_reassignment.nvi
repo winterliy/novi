@@ -1,0 +1,3 @@
+vari label : string = 'ready';
+console.print('must not run');
+label = 42;

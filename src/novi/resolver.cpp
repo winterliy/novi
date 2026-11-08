@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
 
 namespace novi {
@@ -33,13 +34,49 @@ void Resolver::begin_scope() { scopes_.emplace_back(); }
 
 void Resolver::end_scope() { scopes_.pop_back(); }
 
-void Resolver::declare(const std::string& name) { scopes_.back().insert(name); }
+void Resolver::declare(const std::string& name, std::string fixed_type, bool is_constant) {
+    scopes_.back()[name] = {std::move(fixed_type), is_constant};
+}
+
+Resolver::Binding* Resolver::find_binding(const std::string& name) {
+    for (auto scope = scopes_.rbegin(); scope != scopes_.rend(); ++scope) {
+        const auto found = scope->find(name);
+        if (found != scope->end()) return &found->second;
+    }
+    return nullptr;
+}
+
+const Resolver::Binding* Resolver::find_binding(const std::string& name) const {
+    for (auto scope = scopes_.rbegin(); scope != scopes_.rend(); ++scope) {
+        const auto found = scope->find(name);
+        if (found != scope->end()) return &found->second;
+    }
+    return nullptr;
+}
+
+std::string Resolver::known_type(const Expr& expression) const {
+    const auto* literal = std::get_if<LiteralExpr>(&expression.node);
+    if (!literal) return {};
+    if (std::holds_alternative<std::monostate>(literal->value)) return "null";
+    if (std::holds_alternative<bool>(literal->value)) return "boolean";
+    if (std::holds_alternative<std::string>(literal->value)) return "string";
+    return "numeric";
+}
+
+bool Resolver::is_compatible(const std::string& expected, const std::string& actual) const {
+    if (actual.empty()) return true;
+    if (expected == actual) return true;
+    if (expected == "none" && actual == "null") return true;
+    const auto numeric = [](const std::string& type) {
+        return type == "numeric" || type == "integer" || type == "natural" ||
+            type == "nonint" || type == "realn" || type == "decimal" || type == "scalar";
+    };
+    return numeric(expected) && numeric(actual);
+}
 
 void Resolver::require_name(const std::string& name, const SourceSpan& span) {
     if (is_builtin(name)) return;
-    for (auto scope = scopes_.rbegin(); scope != scopes_.rend(); ++scope) {
-        if (scope->find(name) != scope->end()) return;
-    }
+    if (find_binding(name)) return;
     diagnostics_.push_back({DiagnosticCategory::Semantic, "Undefined name '" + name + "'", span});
 }
 
@@ -56,7 +93,14 @@ void Resolver::resolve_statement(const Stmt& statement) {
         [&](const ExpressionStmt& node) { resolve_expression(*node.expression); },
         [&](const VariableDeclStmt& node) {
             if (node.initializer) resolve_expression(*node.initializer);
-            declare(node.name);
+            if (node.initializer && !node.fixed_type.empty()) {
+                const auto actual = known_type(*node.initializer);
+                if (!is_compatible(node.fixed_type, actual))
+                    diagnostics_.push_back({DiagnosticCategory::Semantic,
+                        "Initializer for '" + node.name + "' does not match fixed type '" + node.fixed_type + "'",
+                        statement.span});
+            }
+            declare(node.name, node.fixed_type, node.is_constant);
         },
         [&](const BlockStmt& node) {
             begin_scope();
@@ -90,7 +134,9 @@ void Resolver::resolve_statement(const Stmt& statement) {
         [&](const ReturnStmt& node) {
             if (node.value) resolve_expression(*node.value);
         },
-        [&](const MakeConstantStmt& node) { require_name(node.name, statement.span); },
+        [&](const MakeConstantStmt& node) {
+            require_name(node.name, statement.span);
+        },
         [&](const ClassDeclStmt& node) {
             declare(node.name);
             if (node.superclass) require_name(*node.superclass, statement.span);
@@ -123,6 +169,16 @@ void Resolver::resolve_expression(const Expr& expression) {
         [&](const AssignExpr& node) {
             resolve_expression(*node.value);
             require_name(node.name, expression.span);
+            if (Binding* binding = find_binding(node.name)) {
+                if (binding->is_constant)
+                    diagnostics_.push_back({DiagnosticCategory::Semantic,
+                        "Cannot reassign constant '" + node.name + "'", expression.span});
+                const auto actual = known_type(*node.value);
+                if (!binding->fixed_type.empty() && !is_compatible(binding->fixed_type, actual))
+                    diagnostics_.push_back({DiagnosticCategory::Semantic,
+                        "Assigned value for '" + node.name + "' does not match fixed type '" + binding->fixed_type + "'",
+                        expression.span});
+            }
         },
         [&](const UnaryExpr& node) { resolve_expression(*node.operand); },
         [&](const BinaryExpr& node) {

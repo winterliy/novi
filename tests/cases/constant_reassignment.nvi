@@ -1,0 +1,3 @@
+let limit : integer = 3;
+console.print('must not run');
+limit = 4;

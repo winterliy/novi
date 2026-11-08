@@ -39,6 +39,9 @@ endforeach()
 
 assert_semantic_failure(undefined_name "Undefined name 'missing_name'")
 assert_semantic_failure(catch_out_of_scope "Undefined name 'caught_error'")
+assert_semantic_failure(constant_reassignment "Cannot reassign constant 'limit'")
+assert_semantic_failure(fixed_type_reassignment "does not match fixed type 'string'")
+assert_semantic_failure(fixed_type_initializer "does not match fixed type 'string'")
 
 function(assert_semantic_success name expected)
     execute_process(
