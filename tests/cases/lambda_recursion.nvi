@@ -1,0 +1,8 @@
+vari offset : integer = 10;
+vari plus : = function {value} then output(value + offset);
+console.print(plus(5):string);
+function factorial(n) {
+  if (n <= 1) { output(1); }
+  output(n * factorial(n - 1));
+}
+console.print(factorial(5):string);

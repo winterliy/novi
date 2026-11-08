@@ -33,7 +33,7 @@ function(assert_semantic_failure name expected_message)
 endfunction()
 
 foreach(name IN ITEMS tuple_equality finally_loop_local finally_continue finally_break finally_return
-        finally_throw catch_finally catch_scope string_ascii_mixed function_return dynamic_declaration)
+        finally_throw catch_finally catch_scope string_ascii_mixed function_return dynamic_declaration lambda_recursion)
     assert_case("${name}")
 endforeach()
 

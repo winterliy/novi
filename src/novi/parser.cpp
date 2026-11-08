@@ -330,7 +330,12 @@ StmtPtr Parser::variable_declaration(bool is_constant, bool, bool) {
         report(peek(), "A variable declaration needs a type annotation and an initial value");
         throw ParseFailure{};
     }
-    optional_semicolon();
+    // An inline lambda command already consumes the declaration terminator.
+    // A block-bodied lambda still needs the declaration's own semicolon.
+    const bool lambda_terminated = initializer &&
+        std::holds_alternative<LambdaExpr>(initializer->node) &&
+        previous().kind == TokenKind::Semicolon;
+    if (!lambda_terminated) optional_semicolon();
     return std::make_unique<Stmt>(name.span,
         VariableDeclStmt{name.lexeme, std::move(initializer), std::move(fixed_type), is_constant});
 }
