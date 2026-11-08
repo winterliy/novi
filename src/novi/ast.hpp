@@ -29,6 +29,7 @@ enum class BinaryOperator {
 };
 struct BinaryExpr { BinaryOperator op; ExprPtr left; ExprPtr right; };
 struct CompoundAssignIndexExpr { ExprPtr object; ExprPtr index; ExprPtr value; BinaryOperator op; };
+struct CompoundAssignPropertyExpr { ExprPtr object; std::string name; ExprPtr value; BinaryOperator op; };
 struct TernaryExpr { ExprPtr condition; ExprPtr when_true; ExprPtr when_false; };
 struct CallExpr { ExprPtr callee; std::vector<ExprPtr> arguments; };
 struct GetPropertyExpr { ExprPtr object; std::string name; };
@@ -40,7 +41,7 @@ struct IndexExpr { ExprPtr object; ExprPtr index; };
 struct Expr {
     using Node = std::variant<LiteralExpr, VariableExpr, AssignExpr, UnaryExpr, BinaryExpr,
                               TernaryExpr, CallExpr, GetPropertyExpr, SetPropertyExpr, CastExpr, LambdaExpr,
-                              IndexExpr, AssignIndexExpr, CompoundAssignIndexExpr>;
+                              IndexExpr, AssignIndexExpr, CompoundAssignIndexExpr, CompoundAssignPropertyExpr>;
     SourceSpan span;
     Node node;
 

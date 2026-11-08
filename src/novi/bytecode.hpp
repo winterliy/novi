@@ -13,7 +13,7 @@ namespace novi {
 struct FunctionPrototype;
 
 enum class OpCode {
-    Constant, Null, True, False, Pop, DuplicatePair, ToBoolean,
+    Constant, Null, True, False, Pop, Duplicate, DuplicatePair, ToBoolean,
     GetName, DefineName, DefineConstantName, DefineTypedName, DefineTypedConstantName,
     FreezeName, SetName, Cast,
     Negate, Not, BitNot, Add, Subtract, Multiply, Divide, FloorDivide, Modulo,

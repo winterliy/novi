@@ -64,6 +64,13 @@ ExprPtr Parser::assignment() {
     if (match(TokenKind::PlusEqual) || match(TokenKind::MinusEqual)) {
         const Token op = previous();
         auto* variable = std::get_if<VariableExpr>(&left->node);
+        if (auto* property = std::get_if<GetPropertyExpr>(&left->node)) {
+            ExprPtr value = assignment();
+            const SourceSpan span{left->span.start, value->span.end};
+            return std::make_unique<Expr>(span, CompoundAssignPropertyExpr{
+                std::move(property->object), property->name, std::move(value),
+                op.kind == TokenKind::PlusEqual ? BinaryOperator::Add : BinaryOperator::Subtract});
+        }
         if (auto* index = std::get_if<IndexExpr>(&left->node)) {
             ExprPtr value = assignment();
             const SourceSpan span{left->span.start, value->span.end};
@@ -72,7 +79,7 @@ ExprPtr Parser::assignment() {
                 op.kind == TokenKind::PlusEqual ? BinaryOperator::Add : BinaryOperator::Subtract});
         }
         if (!variable) {
-            report(op, "Compound assignment requires a variable or indexed target");
+            report(op, "Compound assignment requires a variable, property, or indexed target");
             throw ParseFailure{};
         }
         const std::string name = variable->name;

@@ -268,6 +268,10 @@ Value VM::execute() {
             case OpCode::True: stack_.emplace_back(true); break;
             case OpCode::False: stack_.emplace_back(false); break;
             case OpCode::Pop: pop(instruction.span); break;
+            case OpCode::Duplicate:
+                if (stack_.empty()) fail("Operand stack underflow", instruction.span);
+                stack_.push_back(stack_.back());
+                break;
             case OpCode::DuplicatePair: {
                 if (stack_.size() < 2) fail("Operand stack underflow", instruction.span);
                 const Value first = stack_[stack_.size() - 2];

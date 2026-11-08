@@ -412,6 +412,14 @@ private:
                 compile_expression(*node.value);
                 emit(node.op == BinaryOperator::Add ? OpCode::Add : OpCode::Subtract, 0, expression.span);
                 emit(OpCode::SetIndex, 0, expression.span);
+            },
+            [&](const CompoundAssignPropertyExpr& node) {
+                compile_expression(*node.object);
+                emit(OpCode::Duplicate, 0, expression.span);
+                emit(OpCode::GetProperty, add_constant(node.name), expression.span);
+                compile_expression(*node.value);
+                emit(node.op == BinaryOperator::Add ? OpCode::Add : OpCode::Subtract, 0, expression.span);
+                emit(OpCode::SetProperty, add_constant(node.name), expression.span);
             }
         }, expression.node);
     }

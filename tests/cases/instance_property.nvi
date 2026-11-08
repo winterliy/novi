@@ -6,3 +6,9 @@ vari counter : = Counter(5);
 console.print(counter.get():string);
 counter.value = 7;
 console.print(counter.value:string);
+vari calls : integer = 0;
+function getCounter() { calls += 1; output(counter); }
+getCounter().value += 5;
+counter.value -= 2;
+console.print(counter.value:string);
+console.print(calls:string);
