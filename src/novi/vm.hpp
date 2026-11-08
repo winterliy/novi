@@ -51,7 +51,7 @@ private:
                     std::shared_ptr<InstanceObject> return_override = nullptr);
     Value pop(const SourceSpan& span);
     const Constant& constant_at(const Frame& frame, int index, const SourceSpan& span) const;
-    std::string name_at(const Frame& frame, int index, const SourceSpan& span) const;
+    const std::string& name_at(const Frame& frame, int index, const SourceSpan& span) const;
     [[noreturn]] void fail(const std::string& message, const SourceSpan& span) const;
 
     std::ostream& output_;

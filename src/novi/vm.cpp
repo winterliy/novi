@@ -230,7 +230,7 @@ const Constant& VM::constant_at(const Frame& frame, int index, const SourceSpan&
     return constants[static_cast<std::size_t>(index)];
 }
 
-std::string VM::name_at(const Frame& frame, int index, const SourceSpan& span) const {
+const std::string& VM::name_at(const Frame& frame, int index, const SourceSpan& span) const {
     const auto* name = std::get_if<std::string>(&constant_at(frame, index, span));
     if (!name) fail("Expected a name constant", span);
     return *name;
@@ -248,7 +248,7 @@ Value VM::execute() {
         Frame& frame = frames_.back();
         const auto& code = frame.function->prototype->chunk.code;
         if (frame.instruction_pointer >= code.size()) fail("Instruction pointer out of bounds", frame.call_span);
-        const Instruction instruction = code[frame.instruction_pointer++];
+        const Instruction& instruction = code[frame.instruction_pointer++];
         auto require_number = [&](const Value& value) -> double {
             if (!is_number(value)) fail("Expected a number, got " + value_to_string(value), instruction.span);
             return std::get<double>(value.data);
