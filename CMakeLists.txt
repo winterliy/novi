@@ -5,8 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(novi
-    src/main.cpp
+set(NOVI_CORE_SOURCES
     src/novi/compiler.cpp
     src/novi/lexer.cpp
     src/novi/parser.cpp
@@ -15,6 +14,12 @@ add_executable(novi
     src/novi/runtime.cpp
     src/novi/vm.cpp
 )
+add_executable(novi src/main.cpp ${NOVI_CORE_SOURCES})
+option(NOVI_BUILD_BENCHMARKS "Build benchmark executables" OFF)
+if(NOVI_BUILD_BENCHMARKS)
+    add_executable(novi_vm_benchmark benchmarks/vm_loop.cpp ${NOVI_CORE_SOURCES})
+    target_include_directories(novi_vm_benchmark PRIVATE src)
+endif()
 target_include_directories(novi PRIVATE src)
 target_compile_options(novi PRIVATE -Wall -Wextra -Wpedantic)
 
