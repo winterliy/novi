@@ -286,7 +286,7 @@ private:
                     }
                     std::shared_ptr<FunctionPrototype> nested;
                     compile_function(method, statement.span, nested);
-                    klass.methods.push_back({method.name, std::move(nested), method.is_private});
+                    klass.methods.push_back({method.name, std::move(nested), method.is_private, method.is_static});
                 }
                 if (!node.fields.empty()) {
                     auto nested = std::make_shared<FunctionPrototype>();

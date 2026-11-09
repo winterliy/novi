@@ -1,0 +1,5 @@
+class Formatter {
+    static private function secret() { output("hidden"); }
+}
+
+Formatter.secret();

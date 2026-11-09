@@ -88,6 +88,12 @@ std::shared_ptr<FunctionObject> ClassObject::find_method(const std::string& meth
     return superclass ? superclass->find_method(method_name) : nullptr;
 }
 
+std::shared_ptr<FunctionObject> ClassObject::find_static_method(const std::string& method_name) const {
+    const auto found = static_methods.find(method_name);
+    if (found != static_methods.end()) return found->second;
+    return superclass ? superclass->find_static_method(method_name) : nullptr;
+}
+
 std::string value_to_string(const Value& value) {
     if (std::holds_alternative<std::monostate>(value.data)) return "null";
     if (const auto* boolean = std::get_if<bool>(&value.data)) return *boolean ? "true" : "false";

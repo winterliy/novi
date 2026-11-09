@@ -1,0 +1,7 @@
+class Formatter {
+    static function twice(value) {
+        console.print(value * 2);
+    }
+}
+
+Formatter.twice(4);

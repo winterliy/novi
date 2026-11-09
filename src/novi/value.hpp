@@ -156,9 +156,11 @@ struct ClassObject {
     std::string name;
     std::shared_ptr<ClassObject> superclass;
     std::unordered_map<std::string, std::shared_ptr<FunctionObject>> methods;
+    std::unordered_map<std::string, std::shared_ptr<FunctionObject>> static_methods;
     std::unordered_map<std::string, ClassFieldPrototype> fields;
 
     std::shared_ptr<FunctionObject> find_method(const std::string& method_name) const;
+    std::shared_ptr<FunctionObject> find_static_method(const std::string& method_name) const;
 };
 
 struct InstanceObject {

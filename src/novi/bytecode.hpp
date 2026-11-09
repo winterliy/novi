@@ -48,6 +48,7 @@ struct ClassMethodPrototype {
     std::string name;
     std::shared_ptr<FunctionPrototype> function;
     bool is_private = false;
+    bool is_static = false;
 };
 
 struct ClassPrototype {

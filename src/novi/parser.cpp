@@ -404,10 +404,6 @@ StmtPtr Parser::class_declaration(std::vector<std::string>) {
         if (match_name("private") || match(TokenKind::Hash)) is_private = true;
         else match_name("public");
         if (match_name("function")) {
-            if (is_static) {
-                report(previous(), "Static methods are not yet supported");
-                throw ParseFailure{};
-            }
             auto method = function_declaration(is_async, is_static, is_private);
             if (is_private && std::get<FunctionDeclStmt>(method->node).name == "init") {
                 report(previous(), "Private constructors are not yet supported");

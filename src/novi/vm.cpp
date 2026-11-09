@@ -598,7 +598,8 @@ Value VM::execute() {
                     function->owner_class = klass;
                     function->is_private = method.is_private;
                     retain_closure_environment(frame.environment);
-                    klass->methods[method.name] = std::move(function);
+                    if (method.is_static) klass->static_methods[method.name] = std::move(function);
+                    else klass->methods[method.name] = std::move(function);
                 }
                 frame.environment->define(klass->name, Value(klass));
                 break;
@@ -860,6 +861,16 @@ Value VM::execute() {
                     method->callback = [length](VM&, const std::vector<Value>&, const SourceSpan&) {
                         return Value(length);
                     };
+                    stack_.emplace_back(std::move(method));
+                    break;
+                }
+                if (const auto* class_value = std::get_if<std::shared_ptr<ClassObject>>(&object.data)) {
+                    const std::string name = name_at(frame, instruction.operand, instruction.span);
+                    if (!*class_value) fail("Invalid class", instruction.span);
+                    auto method = (*class_value)->find_static_method(name);
+                    if (!method) fail("Undefined static method '" + name + "'", instruction.span);
+                    if (method->is_private && frame.function->owner_class.lock() != method->owner_class.lock())
+                        fail("Private static method '" + name + "' is not accessible", instruction.span);
                     stack_.emplace_back(std::move(method));
                     break;
                 }
