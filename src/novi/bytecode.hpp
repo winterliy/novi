@@ -22,7 +22,7 @@ enum class OpCode {
     Jump, JumpIfFalse, EnterScope, ExitScope, IteratorInit, IteratorNext,
     PushExceptionHandler, PopExceptionHandler, Throw, Rethrow,
     GetIndex, SetIndex,
-    MakeClosure, DefineClass, GetProperty, SetProperty,
+    MakeClosure, DefineClass, GetProperty, SetProperty, InitializeStaticField,
     Call, Return
 };
 
@@ -42,6 +42,7 @@ struct ClassFieldPrototype {
     std::string fixed_type;
     bool is_constant = false;
     bool is_private = false;
+    bool is_static = false;
 };
 
 struct ClassMethodPrototype {

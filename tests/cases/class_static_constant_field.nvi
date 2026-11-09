@@ -1,0 +1,3 @@
+class Fixed { static let count : integer = 5; }
+console.print(Fixed.count);
+Fixed.count = 6;

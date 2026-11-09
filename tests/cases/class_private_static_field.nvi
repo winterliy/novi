@@ -1,0 +1,2 @@
+class Safe { static private vari secret : integer = 3; }
+console.print(Safe.secret);

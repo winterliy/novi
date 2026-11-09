@@ -1,0 +1,12 @@
+class Counter {
+    static vari count : integer = 2;
+    static private vari secret : integer = 7;
+    static private function twice(value) { output(value * 2); }
+    static function increment() { Counter.count += 1; }
+    static function reveal() { output(Counter.secret + Counter.twice(3)); }
+}
+
+Counter.increment();
+Counter.increment();
+console.print(Counter.count);
+console.print(Counter.reveal());

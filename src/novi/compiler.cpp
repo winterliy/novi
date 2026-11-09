@@ -23,10 +23,11 @@ public:
         return function_;
     }
 
-    std::shared_ptr<FunctionPrototype> compile_initializer(const std::vector<FieldDeclStmt>& fields,
+    std::shared_ptr<FunctionPrototype> compile_initializer(const std::vector<const FieldDeclStmt*>& fields,
                                                             const FunctionDeclStmt* initializer,
                                                             const SourceSpan& span) {
-        for (const auto& field : fields) {
+        for (const auto* field_ptr : fields) {
+            const auto& field = *field_ptr;
             emit(OpCode::GetName, add_constant(std::string("this")), span);
             if (field.initializer) compile_expression(*field.initializer);
             else emit(OpCode::Null, 0, span);
@@ -277,10 +278,14 @@ private:
                 ClassPrototype klass;
                 klass.name = node.name;
                 const FunctionDeclStmt* initializer = nullptr;
-                for (const auto& field : node.fields)
-                    klass.fields.push_back({field.name, field.fixed_type, field.is_constant, field.is_private});
+                std::vector<const FieldDeclStmt*> instance_fields;
+                for (const auto& field : node.fields) {
+                    klass.fields.push_back({field.name, field.fixed_type, field.is_constant,
+                                            field.is_private, field.is_static});
+                    if (!field.is_static) instance_fields.push_back(&field);
+                }
                 for (const auto& method : node.methods) {
-                    if (method.name == "init" && !node.fields.empty()) {
+                    if (method.name == "init" && !instance_fields.empty()) {
                         initializer = &method;
                         continue;
                     }
@@ -288,17 +293,24 @@ private:
                     compile_function(method, statement.span, nested);
                     klass.methods.push_back({method.name, std::move(nested), method.is_private, method.is_static});
                 }
-                if (!node.fields.empty()) {
+                if (!instance_fields.empty()) {
                     auto nested = std::make_shared<FunctionPrototype>();
                     nested->name = "init";
                     if (initializer) nested->parameters = initializer->parameters;
                     nested->declaration_span = statement.span;
                     FunctionCompiler nested_compiler(nested);
                     klass.methods.push_back({"init", nested_compiler.compile_initializer(
-                        node.fields, initializer, statement.span), false});
+                        instance_fields, initializer, statement.span), false});
                 }
                 function_->chunk.classes.push_back(std::move(klass));
                 emit(OpCode::DefineClass, static_cast<int>(function_->chunk.classes.size() - 1), statement.span);
+                for (const auto& field : node.fields) {
+                    if (!field.is_static || !field.initializer) continue;
+                    emit(OpCode::GetName, add_constant(node.name), statement.span);
+                    compile_expression(*field.initializer);
+                    emit(OpCode::InitializeStaticField, add_constant(field.name), statement.span);
+                    emit(OpCode::Pop, 0, statement.span);
+                }
             },
             [&](const ImportStmt&) {},
             [&](const ExportStmt&) {}

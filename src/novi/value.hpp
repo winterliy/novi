@@ -158,6 +158,8 @@ struct ClassObject {
     std::unordered_map<std::string, std::shared_ptr<FunctionObject>> methods;
     std::unordered_map<std::string, std::shared_ptr<FunctionObject>> static_methods;
     std::unordered_map<std::string, ClassFieldPrototype> fields;
+    std::unordered_map<std::string, ClassFieldPrototype> static_fields;
+    std::unordered_map<std::string, Value> static_field_values;
 
     std::shared_ptr<FunctionObject> find_method(const std::string& method_name) const;
     std::shared_ptr<FunctionObject> find_static_method(const std::string& method_name) const;

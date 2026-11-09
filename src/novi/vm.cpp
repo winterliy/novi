@@ -589,8 +589,10 @@ Value VM::execute() {
                 auto klass = std::make_shared<ClassObject>();
                 klass->name = prototype.name;
                 klass->superclass = std::move(superclass);
-                for (const auto& field : prototype.fields)
-                    klass->fields[field.name] = field;
+                for (const auto& field : prototype.fields) {
+                    if (field.is_static) klass->static_fields[field.name] = field;
+                    else klass->fields[field.name] = field;
+                }
                 for (const auto& method : prototype.methods) {
                     auto function = std::make_shared<FunctionObject>();
                     function->prototype = method.function;
@@ -867,6 +869,18 @@ Value VM::execute() {
                 if (const auto* class_value = std::get_if<std::shared_ptr<ClassObject>>(&object.data)) {
                     const std::string name = name_at(frame, instruction.operand, instruction.span);
                     if (!*class_value) fail("Invalid class", instruction.span);
+                    bool found_static_field = false;
+                    for (auto owner = *class_value; owner; owner = owner->superclass) {
+                        const auto field = owner->static_fields.find(name);
+                        if (field == owner->static_fields.end()) continue;
+                        if (field->second.is_private && frame.function->owner_class.lock() != owner)
+                            fail("Private static field '" + name + "' is not accessible", instruction.span);
+                        const auto value = owner->static_field_values.find(name);
+                        stack_.push_back(value == owner->static_field_values.end() ? Value{} : value->second);
+                        found_static_field = true;
+                        break;
+                    }
+                    if (found_static_field) break;
                     auto method = (*class_value)->find_static_method(name);
                     if (!method) fail("Undefined static method '" + name + "'", instruction.span);
                     if (method->is_private && frame.function->owner_class.lock() != method->owner_class.lock())
@@ -900,6 +914,27 @@ Value VM::execute() {
             case OpCode::SetProperty: {
                 Value value = pop(instruction.span);
                 Value object = pop(instruction.span);
+                if (const auto* class_value = std::get_if<std::shared_ptr<ClassObject>>(&object.data)) {
+                    const std::string name = name_at(frame, instruction.operand, instruction.span);
+                    if (!*class_value) fail("Invalid class", instruction.span);
+                    bool assigned_static_field = false;
+                    for (auto owner = *class_value; owner; owner = owner->superclass) {
+                        const auto field = owner->static_fields.find(name);
+                        if (field == owner->static_fields.end()) continue;
+                        if (field->second.is_private && frame.function->owner_class.lock() != owner)
+                            fail("Private static field '" + name + "' is not accessible", instruction.span);
+                        if (field->second.is_constant && owner->static_field_values.find(name) != owner->static_field_values.end())
+                            fail("Cannot reassign constant static field '" + name + "'", instruction.span);
+                        if (!field->second.fixed_type.empty() && !value_matches_type(value, field->second.fixed_type))
+                            fail("Assigned value does not match fixed type '" + field->second.fixed_type + "'", instruction.span);
+                        owner->static_field_values[name] = value;
+                        stack_.push_back(std::move(value));
+                        assigned_static_field = true;
+                        break;
+                    }
+                    if (!assigned_static_field) fail("Undefined static field '" + name + "'", instruction.span);
+                    break;
+                }
                 const auto* instance_value = std::get_if<std::shared_ptr<InstanceObject>>(&object.data);
                 if (!instance_value) fail("Only instances have fields", instruction.span);
                 const std::string name = name_at(frame, instruction.operand, instruction.span);
@@ -916,6 +951,20 @@ Value VM::execute() {
                     }
                 }
                 (*instance_value)->fields[name] = value;
+                stack_.push_back(std::move(value));
+                break;
+            }
+            case OpCode::InitializeStaticField: {
+                Value value = pop(instruction.span);
+                Value object = pop(instruction.span);
+                const auto* class_value = std::get_if<std::shared_ptr<ClassObject>>(&object.data);
+                if (!class_value || !*class_value) fail("Static field initializer requires a class", instruction.span);
+                const std::string name = name_at(frame, instruction.operand, instruction.span);
+                const auto field = (*class_value)->static_fields.find(name);
+                if (field == (*class_value)->static_fields.end()) fail("Undefined static field '" + name + "'", instruction.span);
+                if (!field->second.fixed_type.empty() && !value_matches_type(value, field->second.fixed_type))
+                    fail("Assigned value does not match fixed type '" + field->second.fixed_type + "'", instruction.span);
+                (*class_value)->static_field_values[name] = value;
                 stack_.push_back(std::move(value));
                 break;
             }

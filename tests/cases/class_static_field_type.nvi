@@ -1,0 +1,2 @@
+class Typed { static vari count : integer = 1; }
+Typed.count = "wrong";

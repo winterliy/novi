@@ -405,16 +405,17 @@ StmtPtr Parser::class_declaration(std::vector<std::string>) {
         else match_name("public");
         if (match_name("function")) {
             auto method = function_declaration(is_async, is_static, is_private);
-            if (is_private && std::get<FunctionDeclStmt>(method->node).name == "init") {
+            const auto& function = std::get<FunctionDeclStmt>(method->node);
+            if (function.name == "init" && is_static) {
+                report(previous(), "Constructors cannot be static");
+                throw ParseFailure{};
+            }
+            if (is_private && function.name == "init") {
                 report(previous(), "Private constructors are not yet supported");
                 throw ParseFailure{};
             }
             klass.methods.push_back(std::get<FunctionDeclStmt>(std::move(method->node)));
         } else if (match_name("vari")) {
-            if (is_static) {
-                report(previous(), "Static class fields are not yet supported");
-                throw ParseFailure{};
-            }
             auto field = variable_declaration(false, is_private, is_static);
             auto& decl = std::get<VariableDeclStmt>(field->node);
             if (std::any_of(klass.fields.begin(), klass.fields.end(),
@@ -425,10 +426,6 @@ StmtPtr Parser::class_declaration(std::vector<std::string>) {
             klass.fields.push_back({decl.name, std::move(decl.initializer), decl.fixed_type,
                                     decl.is_constant, is_static, is_private});
         } else if (match_name("let")) {
-            if (is_static) {
-                report(previous(), "Static class fields are not yet supported");
-                throw ParseFailure{};
-            }
             auto field = variable_declaration(true, is_private, is_static);
             auto& decl = std::get<VariableDeclStmt>(field->node);
             if (std::any_of(klass.fields.begin(), klass.fields.end(),
