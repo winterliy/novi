@@ -5,6 +5,3 @@
 /src/main
 /src/main.dSYM/
 
-# documentation kept locally only
-*.md
-README*
